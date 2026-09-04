@@ -57,9 +57,13 @@ public final class ConfigManager {
             return;
         }
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(resourceConfig);
+        if (yaml.isConfigurationSection("deployment")) {
+            plugin.getLogger().warning("检测到 v0.0.5 的 deployment 配置：v0.0.6 起该节不再使用。"
+                    + "BcCyberware 资源改由 Oraxen API 注入，请参照最新 resources.yml 的 oraxen 节。");
+        }
         if (!yaml.isConfigurationSection("generation") && !yaml.isConfigurationSection("deployment")) {
             plugin.getLogger().warning("检测到 v0.0.1 格式的 resources.yml：旧版逐包 URL 下发已移除。"
-                    + "请把资源放入 Pack Assets 或 Generation/merge，并参考最新 Release 配置启用统一资源包管理。");
+                    + "请把资源放入 Pack Assets 或 Generation/merge，并由 Oraxen 统一生成和下发。");
         }
     }
 

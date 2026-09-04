@@ -3,36 +3,46 @@ package cn.bilicraft.bccyberware.resourcepack;
 import cn.bilicraft.bccyberware.config.ConfigManager;
 import cn.bilicraft.bccyberware.config.model.ConfigSnapshot;
 import cn.bilicraft.bccyberware.config.model.ResourcePackDeploymentSettings;
-import cn.bilicraft.bccyberware.config.model.ResourcePackDeploymentType;
 import cn.bilicraft.bccyberware.text.TextService;
-import net.kyori.adventure.resource.ResourcePackInfo;
-import net.kyori.adventure.resource.ResourcePackRequest;
+import io.th0rgal.oraxen.api.OraxenPack;
+import io.th0rgal.oraxen.api.events.OraxenPackGeneratedEvent;
+import io.th0rgal.oraxen.api.events.OraxenPackUploadEvent;
+import io.th0rgal.oraxen.utils.VirtualFile;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.net.URI;
-import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
+/**
+ * Generates BcCyberware assets and injects them into Oraxen's single final pack.
+ * Oraxen remains the only component that zips, uploads and dispatches that pack.
+ */
 public final class ResourcePackService implements Listener {
+    private static final long ORAXEN_RETRY_DELAY_TICKS = 40L;
+    private static final int MAX_ORAXEN_RELOAD_ATTEMPTS = 15;
+
     private final JavaPlugin plugin;
     private final ConfigManager configs;
     private final TextService text;
     private final ResourcePackGenerator generator;
-    private final SelfHostedPackServer selfHost;
-    private final ResourcePackManagerBridge managerBridge;
     private final AtomicBoolean taskRunning = new AtomicBoolean();
+    private final AtomicBoolean retryScheduled = new AtomicBoolean();
     private final AtomicLong operationEpoch = new AtomicLong();
-    private volatile DeploymentState state = new DeploymentState(null, null, false);
+
+    private volatile Map<String, byte[]> activeAssets = Map.of();
+    private volatile boolean reloadPending;
+    private volatile int reloadAttempts;
     private volatile boolean closed;
 
     public ResourcePackService(JavaPlugin plugin, ConfigManager configs, TextService text) {
@@ -40,43 +50,55 @@ public final class ResourcePackService implements Listener {
         this.configs = configs;
         this.text = text;
         this.generator = new ResourcePackGenerator(plugin.getDataFolder().toPath());
-        this.managerBridge = new ResourcePackManagerBridge(plugin);
-        this.selfHost = new SelfHostedPackServer(
-                plugin.getLogger(),
-                plugin.getDataFolder().toPath().resolve(".runtime/resourcepack-cache")
-        );
     }
 
     public boolean start() {
-        return scheduleDeployment(true, null);
+        ResourcePackDeploymentSettings settings = configs.current().resourcePackDeployment();
+        return scheduleBuild(settings.generateOnStartup(), null);
     }
 
     public boolean reloadDeploymentAsync(Consumer<Boolean> completion) {
-        return scheduleDeployment(true, completion);
+        ResourcePackDeploymentSettings settings = configs.current().resourcePackDeployment();
+        return scheduleBuild(settings.generateOnStartup(), completion);
+    }
+
+    public boolean generateAsync(Consumer<Boolean> completion) {
+        return scheduleBuild(true, completion);
     }
 
     public boolean isBusy() {
         return taskRunning.get();
     }
 
-    private boolean scheduleDeployment(boolean notifyOnlinePlayers, Consumer<Boolean> completion) {
+    private boolean scheduleBuild(boolean forceGeneration, Consumer<Boolean> completion) {
         if (closed || !taskRunning.compareAndSet(false, true)) {
-            plugin.getLogger().warning("已有资源包生成或部署任务正在运行，本次请求已忽略。");
+            plugin.getLogger().warning("已有资源包生成或 Oraxen 注入任务正在运行，本次请求已忽略。");
             return false;
         }
-        long ticket = operationEpoch.incrementAndGet();
+
         ConfigSnapshot snapshot = configs.current();
+        ResourcePackDeploymentSettings settings = snapshot.resourcePackDeployment();
+        if (forceGeneration && !settings.generationEnabled()) {
+            taskRunning.set(false);
+            plugin.getLogger().warning("resources.yml 中 generation.enabled=false，未生成资源包。");
+            return false;
+        }
+
+        long ticket = operationEpoch.incrementAndGet();
         try {
             Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-                PreparedDeployment prepared;
+                PreparedAssets prepared;
                 try {
-                    prepared = prepareDeployment(snapshot);
+                    ResourcePackGenerator.GeneratedResourcePack pack = forceGeneration
+                            ? generator.generate(snapshot)
+                            : generator.inspectExisting(snapshot);
+                    prepared = new PreparedAssets(pack, OraxenPackAssets.read(pack.file()));
                 } catch (IOException | RuntimeException exception) {
-                    logFailure("资源包生成或部署准备失败", exception);
-                    finishFailure(completion);
+                    logFailure("生成或读取 BcCyberware 资源失败", exception);
+                    finish(completion, false);
                     return;
                 }
-                queueDeploymentApply(prepared, ticket, notifyOnlinePlayers, completion);
+                applyPrepared(snapshot, settings, prepared, ticket, completion);
             });
             return true;
         } catch (RuntimeException exception) {
@@ -86,250 +108,118 @@ public final class ResourcePackService implements Listener {
         }
     }
 
-    private PreparedDeployment prepareDeployment(ConfigSnapshot snapshot) throws IOException {
-        ResourcePackDeploymentSettings settings = snapshot.resourcePackDeployment();
-        ResourcePackGenerator.GeneratedResourcePack candidate = null;
-        if (settings.generationEnabled() && settings.generateOnStartup()) {
-            candidate = generator.generate(snapshot);
-        } else if (settings.deploymentEnabled() && settings.type() != ResourcePackDeploymentType.EXTERNAL) {
-            candidate = generator.inspectExisting(snapshot);
-        }
-
-        SelfHostedPackServer.PreparedPack selfHosted = null;
-        if (settings.deploymentEnabled() && settings.type() == ResourcePackDeploymentType.SELFHOST) {
-            if (candidate == null) {
-                throw new IOException("SELFHOST 没有可部署的本地资源包");
-            }
-            selfHosted = selfHost.prepare(candidate);
-        }
-        return new PreparedDeployment(snapshot, settings, candidate, selfHosted);
-    }
-
-    private void queueDeploymentApply(
-            PreparedDeployment prepared,
-            long ticket,
-            boolean notifyOnlinePlayers,
-            Consumer<Boolean> completion
-    ) {
-        if (closed) {
-            discard(prepared.selfHosted());
-            taskRunning.set(false);
-            return;
-        }
-        try {
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                boolean success = false;
-                try {
-                    if (closed || operationEpoch.get() != ticket || configs.current() != prepared.snapshot()) {
-                        discard(prepared.selfHosted());
-                        plugin.getLogger().warning("资源包后台处理期间配置已变化，结果未部署；请重新执行重载。");
-                    } else {
-                        success = applyPreparedDeployment(prepared, notifyOnlinePlayers);
-                    }
-                } catch (RuntimeException exception) {
-                    discard(prepared.selfHosted());
-                    logFailure("应用资源包部署状态失败", exception);
-                }
-                taskRunning.set(false);
-                invokeCompletion(completion, success);
-            });
-        } catch (RuntimeException exception) {
-            discard(prepared.selfHosted());
-            taskRunning.set(false);
-            logFailure("无法回到主线程应用资源包部署", exception);
-        }
-    }
-
-    private boolean applyPreparedDeployment(PreparedDeployment prepared, boolean notifyOnlinePlayers) {
-        ResourcePackDeploymentSettings settings = prepared.settings();
-        DeploymentState previousState = state;
-        ResourcePackDeploymentSettings previous = previousState.settings();
-        ResourcePackGenerator.GeneratedResourcePack previousPack = previousState.pack();
-        boolean wasReady = previousState.ready();
-
-        try {
-            if (wasReady && previous != null
-                    && previous.type() == ResourcePackDeploymentType.RESOURCE_PACK_MANAGER
-                    && (!settings.deploymentEnabled()
-                    || settings.type() != ResourcePackDeploymentType.RESOURCE_PACK_MANAGER)) {
-                throw new IOException("ResourcePackManager 的公开 API 没有取消注册方法；"
-                        + "从统一管理模式切换到其他模式或关闭部署后必须重启服务器，避免同时下发两份资源包");
-            }
-            if (settings.deploymentEnabled() && settings.type() == ResourcePackDeploymentType.SELFHOST) {
-                selfHost.startPrepared(settings.bindAddress(), settings.port(), prepared.selfHosted());
-                plugin.getLogger().info("资源包 SELFHOST 已监听 " + settings.bindAddress() + ":" + settings.port()
-                        + "，文件 " + prepared.candidate().file().getFileName()
-                        + "，SHA-1 " + prepared.candidate().sha1Hex());
-            } else if (settings.deploymentEnabled()
-                    && settings.type() == ResourcePackDeploymentType.RESOURCE_PACK_MANAGER) {
-                if (prepared.candidate() == null) {
-                    throw new IOException("RESOURCE_PACK_MANAGER 没有可注册的本地资源包");
-                }
-                managerBridge.register(prepared.candidate().file());
-                selfHost.close();
-                plugin.getLogger().info("已将 " + prepared.candidate().file().getFileName()
-                        + " 注册给 ResourcePackManager；等待其稳定检测后统一合并、托管并下发。");
-            } else {
-                selfHost.close();
-            }
-        } catch (IOException | RuntimeException exception) {
-            logFailure("资源包部署失败", exception);
-            plugin.getLogger().warning("资源包部署保留上一个可用状态，不会向玩家发送失败配置。");
-            return false;
-        }
-
-        if (prepared.candidate() != null
-                && (!settings.deploymentEnabled() || settings.type() == ResourcePackDeploymentType.EXTERNAL)) {
-            plugin.getLogger().info("资源包已生成：" + prepared.candidate().file()
-                    + "，SHA-1 " + prepared.candidate().sha1Hex());
-        }
-
-        if (settings.deploymentEnabled() && settings.type() == ResourcePackDeploymentType.EXTERNAL
-                && prepared.candidate() != null
-                && !Arrays.equals(prepared.candidate().sha1(), settings.externalSha1())) {
-            plugin.getLogger().warning("本地生成资源包的 SHA-1 与 EXTERNAL 已部署 SHA-1 不同；"
-                    + "继续向玩家发送配置中的已上传版本。上传新 ZIP、更新 sha1 后执行重载即可切换。");
-        }
-
-        DeploymentState currentState = new DeploymentState(
-                settings,
-                prepared.candidate(),
-                settings.deploymentEnabled()
-        );
-        state = currentState;
-        if (notifyOnlinePlayers) {
-            if (wasReady && isDirect(previous)
-                    && (!currentState.ready() || !isDirect(settings) || !previous.uuid().equals(settings.uuid()))) {
-                Bukkit.getOnlinePlayers().forEach(player -> player.removeResourcePack(previous.uuid()));
-            }
-            boolean changed = !wasReady
-                    || previous == null
-                    || previous.type() != settings.type()
-                    || !previous.uuid().equals(settings.uuid())
-                    || !previous.publicUrl().equals(settings.publicUrl())
-                    || (!previous.autoSendEnabled() && settings.autoSendEnabled())
-                    || (settings.type() == ResourcePackDeploymentType.SELFHOST
-                    && (previousPack == null || prepared.candidate() == null
-                    || !previousPack.sha1Hex().equals(prepared.candidate().sha1Hex())))
-                    || (settings.type() == ResourcePackDeploymentType.EXTERNAL
-                    && !Arrays.equals(previous.externalSha1(), settings.externalSha1()));
-            boolean firstAvailableDeployment = !wasReady;
-            if (currentState.ready() && isDirect(settings) && settings.autoSendEnabled()
-                    && (firstAvailableDeployment || (settings.sendOnUpdate() && changed))) {
-                Bukkit.getOnlinePlayers().forEach(this::sendGenerated);
-            }
-        }
-        return true;
-    }
-
-    public boolean generateAsync(Consumer<Boolean> completion) {
-        ConfigSnapshot snapshot = configs.current();
-        ResourcePackDeploymentSettings configured = snapshot.resourcePackDeployment();
-        if (!configured.generationEnabled()) {
-            plugin.getLogger().warning("resources.yml 中 generation.enabled=false，未生成资源包。");
-            return false;
-        }
-        if (closed || !taskRunning.compareAndSet(false, true)) {
-            plugin.getLogger().warning("已有资源包生成或部署任务正在运行，本次请求已忽略。");
-            return false;
-        }
-        long ticket = operationEpoch.incrementAndGet();
-        try {
-            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-                GeneratedTaskResult prepared;
-                try {
-                    ResourcePackGenerator.GeneratedResourcePack candidate = generator.generate(snapshot);
-                    DeploymentState currentState = state;
-                    ResourcePackDeploymentSettings active = currentState.settings();
-                    SelfHostedPackServer.PreparedPack selfHosted = null;
-                    if (currentState.ready() && active != null
-                            && active.type() == ResourcePackDeploymentType.SELFHOST) {
-                        selfHosted = selfHost.prepare(candidate);
-                    }
-                    prepared = new GeneratedTaskResult(candidate, selfHosted, currentState);
-                } catch (IOException | RuntimeException exception) {
-                    logFailure("资源包生成失败", exception);
-                    finishFailure(completion);
-                    return;
-                }
-                queueGeneratedApply(snapshot, ticket, prepared, completion);
-            });
-            return true;
-        } catch (RuntimeException exception) {
-            taskRunning.set(false);
-            logFailure("无法调度资源包生成任务", exception);
-            return false;
-        }
-    }
-
-    private void queueGeneratedApply(
+    private void applyPrepared(
             ConfigSnapshot snapshot,
+            ResourcePackDeploymentSettings settings,
+            PreparedAssets prepared,
             long ticket,
-            GeneratedTaskResult prepared,
             Consumer<Boolean> completion
     ) {
-        if (closed) {
-            discard(prepared.selfHosted());
-            taskRunning.set(false);
-            return;
-        }
         try {
             Bukkit.getScheduler().runTask(plugin, () -> {
                 boolean success = false;
                 try {
                     if (closed || operationEpoch.get() != ticket || configs.current() != snapshot) {
-                        discard(prepared.selfHosted());
-                        plugin.getLogger().warning("资源包生成期间配置已变化，结果未部署；请重新执行生成命令。");
+                        plugin.getLogger().warning("资源包生成期间配置已变化，结果未注入 Oraxen；请重新执行重载。");
                     } else {
-                        DeploymentState currentState = state;
-                        ResourcePackDeploymentSettings active = currentState.settings();
-                        if (currentState != prepared.stateAtPreparation()) {
-                            discard(prepared.selfHosted());
-                            plugin.getLogger().warning("资源包部署状态已变化，生成结果未发布；请重新执行生成命令。");
-                        } else {
-                            if (prepared.selfHosted() != null) {
-                                if (!currentState.ready() || active == null
-                                        || active.type() != ResourcePackDeploymentType.SELFHOST) {
-                                    throw new IllegalStateException("SELFHOST 准备结果与当前部署状态不一致");
-                                }
-                                selfHost.publishPrepared(prepared.selfHosted());
-                            }
-                            if (currentState.ready() && active != null
-                                    && active.type() == ResourcePackDeploymentType.RESOURCE_PACK_MANAGER) {
-                                managerBridge.register(prepared.candidate().file());
-                                plugin.getLogger().info("已更新 ResourcePackManager 的 BcCyberware 资源源；"
-                                        + "统一管理器将在稳定检测后重新合并。");
-                            }
-                            state = new DeploymentState(active, prepared.candidate(), currentState.ready());
-                            plugin.getLogger().info("资源包已生成：" + prepared.candidate().file()
-                                    + "，SHA-1 " + prepared.candidate().sha1Hex());
-                            if (currentState.ready() && active != null
-                                    && active.type() == ResourcePackDeploymentType.SELFHOST
-                                    && active.autoSendEnabled() && active.sendOnUpdate()) {
-                                Bukkit.getOnlinePlayers().forEach(this::sendGenerated);
-                            } else if (currentState.ready() && active != null
-                                    && active.type() == ResourcePackDeploymentType.EXTERNAL) {
-                                plugin.getLogger().info("EXTERNAL 模式只生成了本地 ZIP，未切换或推送远端资源包；"
-                                        + "请先上传文件，再更新 resources.yml 的 sha1 并重载。");
-                            }
-                            success = true;
+                        activeAssets = settings.oraxenIntegrationEnabled()
+                                ? immutableCopy(prepared.assets())
+                                : Map.of();
+                        plugin.getLogger().info("BcCyberware 资源已准备：" + prepared.pack().file()
+                                + "，SHA-1 " + prepared.pack().sha1Hex()
+                                + "，可注入文件 " + activeAssets.size() + " 个。");
+                        if (settings.reloadOraxenAfterGeneration()) {
+                            requestOraxenReload();
                         }
+                        success = true;
                     }
-                } catch (IOException | RuntimeException exception) {
-                    discard(prepared.selfHosted());
-                    logFailure("应用新生成资源包失败", exception);
+                } catch (RuntimeException exception) {
+                    logFailure("应用 Oraxen 资源注入状态失败", exception);
+                } finally {
+                    taskRunning.set(false);
+                    invokeCompletion(completion, success);
                 }
-                taskRunning.set(false);
-                invokeCompletion(completion, success);
             });
         } catch (RuntimeException exception) {
-            discard(prepared.selfHosted());
             taskRunning.set(false);
-            logFailure("无法回到主线程应用生成结果", exception);
+            logFailure("无法回到主线程应用 Oraxen 资源注入", exception);
         }
     }
 
-    private void finishFailure(Consumer<Boolean> completion) {
+    private Map<String, byte[]> immutableCopy(Map<String, byte[]> source) {
+        LinkedHashMap<String, byte[]> copy = new LinkedHashMap<>();
+        source.forEach((path, bytes) -> copy.put(path, bytes.clone()));
+        return java.util.Collections.unmodifiableMap(copy);
+    }
+
+    private void requestOraxenReload() {
+        reloadPending = true;
+        reloadAttempts = 0;
+        scheduleOraxenReloadRetry();
+    }
+
+    private void tryOraxenReload() {
+        if (closed || !reloadPending) {
+            return;
+        }
+        reloadAttempts++;
+        OraxenPack.reloadPack();
+        if (reloadPending && reloadAttempts < MAX_ORAXEN_RELOAD_ATTEMPTS) {
+            scheduleOraxenReloadRetry();
+        } else if (reloadPending) {
+            plugin.getLogger().severe("Oraxen 连续未进入资源包生成事件；BcCyberware 资源尚未注入。"
+                    + "请检查 Oraxen Pack.generation.generate，并执行 /bccyberware resourcepack generate 重试。");
+        }
+    }
+
+    private void scheduleOraxenReloadRetry() {
+        if (!closed && reloadPending && retryScheduled.compareAndSet(false, true)) {
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                retryScheduled.set(false);
+                tryOraxenReload();
+            }, ORAXEN_RETRY_DELAY_TICKS);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onOraxenPackGenerated(OraxenPackGeneratedEvent event) {
+        if (closed) {
+            return;
+        }
+        if (!configs.current().resourcePackDeployment().oraxenIntegrationEnabled()) {
+            reloadPending = false;
+            return;
+        }
+        Map<String, byte[]> assets = activeAssets;
+        if (assets.isEmpty()) {
+            plugin.getLogger().warning("Oraxen 正在生成资源包，但 BcCyberware 尚无可注入资源。");
+            return;
+        }
+
+        event.getOutput().removeIf(file -> assets.containsKey(file.getPath()));
+        assets.forEach((path, bytes) -> {
+            int separator = path.lastIndexOf('/');
+            String parent = separator < 0 ? "" : path.substring(0, separator);
+            String name = separator < 0 ? path : path.substring(separator + 1);
+            event.getOutput().add(new VirtualFile(parent, name, new ByteArrayInputStream(bytes)));
+        });
+        reloadPending = false;
+        plugin.getLogger().info("已通过 OraxenPackGeneratedEvent 注入 " + assets.size()
+                + " 个 BcCyberware 资源；最终 ZIP、上传和玩家下发由 Oraxen 统一完成。");
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onOraxenPackUploaded(OraxenPackUploadEvent event) {
+        if (reloadPending) {
+            Bukkit.getScheduler().runTask(plugin, this::tryOraxenReload);
+        }
+    }
+
+    public void send(Player player) {
+        text.send(player, "resource-pack-managed-by-oraxen");
+    }
+
+    private void finish(Consumer<Boolean> completion, boolean success) {
         if (closed || !plugin.isEnabled()) {
             taskRunning.set(false);
             return;
@@ -337,17 +227,11 @@ public final class ResourcePackService implements Listener {
         try {
             Bukkit.getScheduler().runTask(plugin, () -> {
                 taskRunning.set(false);
-                invokeCompletion(completion, false);
+                invokeCompletion(completion, success);
             });
         } catch (RuntimeException exception) {
             taskRunning.set(false);
-            logFailure("无法回到主线程报告资源包任务失败", exception);
-        }
-    }
-
-    private void discard(SelfHostedPackServer.PreparedPack prepared) {
-        if (prepared != null) {
-            selfHost.discardPrepared(prepared);
+            logFailure("无法回到主线程报告资源包任务结果", exception);
         }
     }
 
@@ -374,127 +258,13 @@ public final class ResourcePackService implements Listener {
         closed = true;
         operationEpoch.incrementAndGet();
         taskRunning.set(false);
-        state = new DeploymentState(null, null, false);
-        selfHost.close();
+        reloadPending = false;
+        activeAssets = Map.of();
     }
 
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        DeploymentState currentState = state;
-        ResourcePackDeploymentSettings settings = currentState.settings();
-        boolean generatedAutoSend = settings != null && currentState.ready()
-                && isDirect(settings) && settings.autoSendEnabled();
-        if (!generatedAutoSend) {
-            return;
-        }
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (event.getPlayer().isOnline()) {
-                DeploymentState delayedState = state;
-                ResourcePackDeploymentSettings current = delayedState.settings();
-                if (current != null && delayedState.ready() && current.autoSendEnabled()) {
-                    sendGenerated(event.getPlayer());
-                }
-            }
-        }, configs.current().resourcePackDelayTicks());
-    }
-
-    public void send(Player player) {
-        DeploymentState currentState = state;
-        ResourcePackDeploymentSettings settings = currentState.settings();
-        if (settings == null || !currentState.ready()) {
-            text.send(player, "resource-pack-unavailable");
-            return;
-        }
-        if (settings.type() == ResourcePackDeploymentType.RESOURCE_PACK_MANAGER) {
-            text.send(player, "resource-pack-managed-externally");
-            return;
-        }
-        sendGenerated(player);
-    }
-
-    private void sendGenerated(Player player) {
-        DeploymentState currentState = state;
-        ResourcePackDeploymentSettings settings = currentState.settings();
-        ResourcePackGenerator.GeneratedResourcePack current = currentState.pack();
-        if (currentState.ready() && settings != null && isDirect(settings)
-                && (settings.type() == ResourcePackDeploymentType.EXTERNAL || current != null)) {
-            String url = generatedUrl(settings, current == null ? "" : current.sha1Hex());
-            String sha1 = settings.type() == ResourcePackDeploymentType.EXTERNAL
-                    ? toHex(settings.externalSha1())
-                    : current.sha1Hex();
-            ResourcePackInfo info = ResourcePackInfo.resourcePackInfo(settings.uuid(), URI.create(url), sha1);
-            ResourcePackRequest request = ResourcePackRequest.resourcePackRequest()
-                    .packs(info)
-                    .replace(true)
-                    .required(settings.required())
-                    .prompt(text.render(settings.prompt()))
-                    .build();
-            player.sendResourcePacks(request);
-        }
-    }
-
-    private String generatedUrl(ResourcePackDeploymentSettings settings, String sha1) {
-        String configured = settings.publicUrl().replaceAll("/+$", "");
-        if (settings.type() == ResourcePackDeploymentType.SELFHOST) {
-            return configured + SelfHostedPackServer.downloadPath(sha1);
-        }
-        return configured;
-    }
-
-    private boolean isDirect(ResourcePackDeploymentSettings settings) {
-        return settings != null && (settings.type() == ResourcePackDeploymentType.SELFHOST
-                || settings.type() == ResourcePackDeploymentType.EXTERNAL);
-    }
-
-    private String toHex(byte[] bytes) {
-        StringBuilder result = new StringBuilder(bytes.length * 2);
-        for (byte value : bytes) {
-            result.append(String.format("%02x", value & 0xff));
-        }
-        return result.toString();
-    }
-
-    @EventHandler
-    public void onStatus(PlayerResourcePackStatusEvent event) {
-        ResourcePackDeploymentSettings settings = state.settings();
-        boolean generatedPackEvent = settings != null && isDirect(settings)
-                && event.getID().equals(settings.uuid());
-        if (!generatedPackEvent) {
-            return;
-        }
-        String status = event.getStatus().name();
-        switch (status) {
-            case "SUCCESSFULLY_LOADED" -> text.send(event.getPlayer(), "resource-pack-loaded");
-            case "DECLINED" -> text.send(event.getPlayer(), "resource-pack-declined");
-            case "FAILED_DOWNLOAD", "INVALID_URL", "FAILED_RELOAD", "DISCARDED" -> {
-                text.send(event.getPlayer(), "resource-pack-failed");
-                plugin.getLogger().warning("玩家 " + event.getPlayer().getName() + " 的资源包状态为 " + status);
-            }
-            default -> {
-                // ACCEPTED 与 DOWNLOADED 是正常中间状态，不刷屏。
-            }
-        }
-    }
-
-    private record PreparedDeployment(
-            ConfigSnapshot snapshot,
-            ResourcePackDeploymentSettings settings,
-            ResourcePackGenerator.GeneratedResourcePack candidate,
-            SelfHostedPackServer.PreparedPack selfHosted
-    ) {
-    }
-
-    private record GeneratedTaskResult(
-            ResourcePackGenerator.GeneratedResourcePack candidate,
-            SelfHostedPackServer.PreparedPack selfHosted,
-            DeploymentState stateAtPreparation
-    ) {
-    }
-
-    private record DeploymentState(
-            ResourcePackDeploymentSettings settings,
+    private record PreparedAssets(
             ResourcePackGenerator.GeneratedResourcePack pack,
-            boolean ready
+            Map<String, byte[]> assets
     ) {
     }
 }

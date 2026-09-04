@@ -207,52 +207,30 @@ plugins/BcCyberware/packs/example/Assets/
 插件在后台按 Pack 的 `priority` 合并这些目录，再用 `Generation/merge/` 中的服主文件执行
 最终覆盖，输出为 `Generation/resource_pack.zip`。
 
-推荐从 Nightbreak 安装 ResourcePackManager 2.3.1 或更新版本，并在 `resources.yml` 使用。
-不要使用其 GitHub Releases 页面上的旧 0.0.2 预发布包，该旧包不含所需公开 API：
+BcCyberware 直接依赖 Oraxen，并使用 Oraxen 官方公开的资源包生成事件。`resources.yml`
+默认配置如下：
 
 ```yaml
-deployment:
+oraxen:
   enabled: true
-  type: RESOURCE_PACK_MANAGER
+  reload-after-generation: true
 ```
 
-BcCyberware 会通过 ResourcePackManager 的公开 API 注册相对于 `plugins/` 的本地 ZIP。
-统一管理器负责把它与其他插件提供的资源合成一个最终服务器包，并负责托管、进服发送、
-强制加载、提示语和重发。此模式下 BcCyberware 不监听 8168，不读取 `public-url`，
-也绝不会再向玩家单独发送第二个包。相关发送选项只在 ResourcePackManager 中配置，
-避免两套配置同时成为权限来源。
+BcCyberware 完成本地合并后，只读取中间 ZIP 内的 `assets/` 文件，并在
+`OraxenPackGeneratedEvent` 中加入 Oraxen 的输出列表；根目录的 `pack.mcmeta` 和 `pack.png`
+不会覆盖 Oraxen 的文件。同路径文件会先从事件输出中移除，再加入 BcCyberware 的版本，
+因此 BcCyberware 的 `Generation/merge/` 仍然是其自身资源的最终覆盖层。建议所有义体资源
+使用独立的 `bccyberware` 命名空间，避免和服主已有 Oraxen 资源发生冲突。
 
-注册或重新生成后，BcCyberware 不会强制重启 ResourcePackManager；它会让统一管理器自带的
-文件稳定监视器完成暂存和重新合并。这样兼容 ResourcePackManager 2.3.1 的初始化顺序，
-也避免资源刚注册、尚未暂存就被全量重载清掉监视状态。等待数秒后可用 `/rspm status`
-确认最终包状态。
+`reload-after-generation=true` 时，BcCyberware 会调用官方 `OraxenPack.reloadPack()`。
+若 Oraxen 启动时正在生成，BcCyberware 会等待其上传事件后重试，直到自己的资源真正进入
+一次生成事件。Oraxen 随后按 `plugins/Oraxen/settings.yml` 的 `Pack.upload` 与
+`Pack.dispatch` 配置生成最终 ZIP、上传并向玩家发送。BcCyberware 不监听额外 HTTP 端口，
+不要求下载直链，也不会调用 Paper 的资源包发送接口再发第二份包。
 
-如需决定同名模型、纹理发生冲突时谁覆盖谁，请把插件名 `BcCyberware` 加入
-`plugins/ResourcePackManager/config.yml` 的 `priorityOrder`；未列出时会按
-ResourcePackManager 的默认最低优先级参与合并。
-
-从 `RESOURCE_PACK_MANAGER` 热切换为其他模式或关闭部署时，配置重载会保留原有资源包状态
-并要求完整重启服务器。这是因为其公开 API 没有取消注册入口；拒绝热切换可以防止旧注册
-仍被合并、同时 BcCyberware 又开始独立发送。
-
-如果服务器不使用统一管理器，可以选择 `SELFHOST`。它会在配置端口托管该 ZIP；填写玩家
-可访问的 `public-url`、启用部署并放行端口后，`auto-send.enabled=true` 会在玩家加入时
-自动下发，`send-on-update=true` 会在重新生成后立即推送给在线玩家。插件使用带 SHA-1
-的不可变下载路径，旧缓存只保留最近 4 代。
-
-`EXTERNAL` 适合自行上传：先执行 generate，再上传 `Generation/resource_pack.zip`，把
-完整下载地址和已上传文件的 40 位 `sha1` 写入配置，最后 reload 才会切换和热推送。
-为避免上传时序错误，EXTERNAL 的 generate 只生成本地文件，不会擅自推送尚未上传的新包。
-
-SELFHOST 面向单服正常玩家流量：最多同时传输 64 个请求，额外请求等待
-最多 30 秒。大型资源包或高并发公网服建议在前方使用反向代理，或改用 EXTERNAL/CDN。
-仅当修改监听地址或端口时，旧监听会给在途下载最多 5 秒排空时间；同端口的日常内容
-热更新使用新的哈希地址，不受这项限制。
-
-SELFHOST 与 EXTERNAL 都是“独立模式”：BcCyberware 使用单个 `replace=true` 的资源包请求，
-并必须成为该服务器唯一的资源包发送方。请先把其他插件资源复制或生成到 Pack `Assets/`
-或 `Generation/merge/`，同时清空 `server.properties` 中的资源包地址并关闭其他插件的发送。
-否则其他发送方仍可能在不同时机额外弹出资源包；BcCyberware 无法替其他插件撤销请求。
+若临时设置 `oraxen.enabled=false`，BcCyberware 会停止注入，并在允许自动重载时触发 Oraxen
+重建，以便从最终包中移除旧的义体资源。Oraxen 是插件硬依赖；没有 Oraxen 时 Paper 会阻止
+BcCyberware 启动。
 
 默认核心材质会从插件 JAR 自动释放到 `packs/core/Assets/`，已存在的服主文件不会被覆盖。
 旧 `external-packs` 列表不再支持，非空配置会拒绝加载并指向统一合并迁移方式。
@@ -264,10 +242,9 @@ SELFHOST 与 EXTERNAL 都是“独立模式”：BcCyberware 使用单个 `repla
 - `/bccyberware capacity get|set|add <玩家> [数值]`：查看或修改永久容量。
 - `/bccyberware inspect`：读取主手物品的 PDC 身份。
 - `/bccyberware pack`：列出已加载 Pack 和顺序。
-- `/bccyberware resourcepack generate`：重新生成；统一模式会触发 ResourcePackManager
-  重新合并，SELFHOST 可按配置热推，EXTERNAL 需上传并更新 SHA-1 后再重载。
-- `/bccyberware resourcepack [玩家]`：仅在 SELFHOST/EXTERNAL 独立模式下重新发送一个
-  最终包；统一模式会提示改用 ResourcePackManager 的重发方式。
+- `/bccyberware resourcepack generate`：重新合并 BcCyberware Assets，并调用 Oraxen 重建、
+  上传最终包。
+- `/bccyberware resourcepack [玩家]`：提示改用 Oraxen 自己的资源包重发功能。
 - `/bccyberware reload`：校验后原子重载配置。
 
 普通玩家默认拥有 `bccyberware.use` 和 `bccyberware.install`。管理命令使用

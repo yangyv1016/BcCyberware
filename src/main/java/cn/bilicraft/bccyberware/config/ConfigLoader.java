@@ -8,7 +8,6 @@ import cn.bilicraft.bccyberware.config.model.GuiSettings;
 import cn.bilicraft.bccyberware.config.model.ItemDefinition;
 import cn.bilicraft.bccyberware.config.model.PackDefinition;
 import cn.bilicraft.bccyberware.config.model.ResourcePackDeploymentSettings;
-import cn.bilicraft.bccyberware.config.model.ResourcePackDeploymentType;
 import cn.bilicraft.bccyberware.config.model.SlotDefinition;
 import cn.bilicraft.bccyberware.config.model.ThresholdRule;
 import cn.bilicraft.bccyberware.config.model.TriggerSpec;
@@ -23,8 +22,6 @@ import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
@@ -40,7 +37,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
-import java.util.UUID;
 import java.util.regex.Pattern;
 
 final class ConfigLoader {
@@ -65,7 +61,6 @@ final class ConfigLoader {
         int schemaVersion = integer(main, "config.yml", "schema-version", 1, 1, Integer.MAX_VALUE);
 
         boolean createDefaultOrgans = main.getBoolean("general.create-default-organs", true);
-        long packDelay = ticks(main, "config.yml", "general.resource-pack-delay", "1s", true);
         long engineTick = ticks(main, "config.yml", "general.effect-engine-tick", "10t", false);
         long saveDebounce = ticks(main, "config.yml", "general.save-debounce", "2s", false);
 
@@ -113,7 +108,6 @@ final class ConfigLoader {
         return new ConfigSnapshot(
                 schemaVersion,
                 createDefaultOrgans,
-                packDelay,
                 engineTick,
                 saveDebounce,
                 databaseFile,
@@ -489,6 +483,7 @@ final class ConfigLoader {
     private ResourcePackDeploymentSettings loadResourcePackDeployment(YamlConfiguration yaml) throws ConfigException {
         String file = "resources.yml";
         boolean deploymentConfigured = yaml.isConfigurationSection("generation")
+                || yaml.isConfigurationSection("oraxen")
                 || yaml.isConfigurationSection("deployment");
         String outputFile = yaml.getString("generation.output", "Generation/resource_pack.zip");
         String mergeDirectory = yaml.getString("generation.merge-directory", "Generation/merge");
@@ -508,61 +503,13 @@ final class ConfigLoader {
                     "生成结果不能放在插件内部使用的 .runtime 目录内");
         }
 
-        ResourcePackDeploymentType type = enumValue(
-                ResourcePackDeploymentType.class,
-                yaml.getString("deployment.type", "RESOURCE_PACK_MANAGER"),
-                file,
-                "deployment.type"
-        );
-        int port = integer(yaml, file, "deployment.self-hosting.port", 8168, 1, 65535);
-        String publicUrl = yaml.getString("deployment.auto-send.public-url", "").trim();
-        boolean deploymentEnabled = yaml.getBoolean("deployment.enabled", false);
-        boolean autoSendEnabled = yaml.getBoolean("deployment.auto-send.enabled", true);
-        if (deploymentEnabled && type != ResourcePackDeploymentType.RESOURCE_PACK_MANAGER
-                && publicUrl.isEmpty()) {
-            throw error(file, "deployment.auto-send.public-url",
-                    "启用部署时需要填写玩家可访问的 http:// 或 https:// 地址");
-        }
-        if (!publicUrl.isEmpty()) {
-            validateHttpUrl(file, "deployment.auto-send.public-url", publicUrl,
-                    type == ResourcePackDeploymentType.SELFHOST);
-        }
-        String externalHash = yaml.getString("deployment.auto-send.sha1", "").trim();
-        if (type == ResourcePackDeploymentType.EXTERNAL && deploymentEnabled
-                && !externalHash.matches("[0-9a-fA-F]{40}")) {
-            throw error(file, "deployment.auto-send.sha1",
-                    "EXTERNAL 部署需要填写已上传 ZIP 的 40 位十六进制 SHA-1");
-        }
-        if (!externalHash.isEmpty() && !externalHash.matches("[0-9a-fA-F]{40}")) {
-            throw error(file, "deployment.auto-send.sha1", "需要 40 位十六进制 SHA-1，或保持留空");
-        }
-
-        UUID uuid;
-        try {
-            uuid = UUID.fromString(yaml.getString(
-                    "deployment.auto-send.uuid",
-                    "b5c9a5c4-a607-4b35-92a3-81d0b40915a2"
-            ));
-        } catch (IllegalArgumentException exception) {
-            throw new ConfigException(file, "deployment.auto-send.uuid", "需要标准 UUID", exception);
-        }
-
         return new ResourcePackDeploymentSettings(
                 yaml.getBoolean("generation.enabled", deploymentConfigured),
                 yaml.getBoolean("generation.generate-on-startup", true),
                 outputFile,
                 mergeDirectory,
-                deploymentEnabled,
-                type,
-                yaml.getString("deployment.self-hosting.bind-address", "0.0.0.0").trim(),
-                port,
-                publicUrl,
-                externalHash.isEmpty() ? new byte[0] : hex(externalHash),
-                autoSendEnabled,
-                yaml.getBoolean("deployment.auto-send.send-on-update", true),
-                uuid,
-                yaml.getBoolean("deployment.auto-send.force", true),
-                yaml.getString("deployment.auto-send.prompt", "<aqua>BcCyberware 需要加载义体外观资源包。")
+                yaml.getBoolean("oraxen.enabled", true),
+                yaml.getBoolean("oraxen.reload-after-generation", true)
         );
     }
 
@@ -591,7 +538,7 @@ final class ConfigLoader {
         if (legacyConfigured) {
             throw error("resources.yml", "external-packs",
                     "BcCyberware 不再逐包下发外部资源包。请将资源放入内容 Pack 的 Assets/ 或 "
-                            + "Generation/merge/，再由 RESOURCE_PACK_MANAGER 统一合并和发送");
+                            + "Generation/merge/，由 BcCyberware 合成一个最终 ZIP 后发送");
         }
         for (PackDefinition pack : loadedPacks) {
             Path manifest = dataDirectory.resolve("packs").resolve(pack.id()).resolve("pack.yml");
@@ -902,37 +849,6 @@ final class ConfigLoader {
 
     private static List<String> lowerList(List<String> values) {
         return values.stream().map(value -> value.toLowerCase(Locale.ROOT)).toList();
-    }
-
-    private static byte[] hex(String value) {
-        byte[] bytes = new byte[value.length() / 2];
-        for (int index = 0; index < bytes.length; index++) {
-            bytes[index] = (byte) Integer.parseInt(value.substring(index * 2, index * 2 + 2), 16);
-        }
-        return bytes;
-    }
-
-    private static void validateHttpUrl(String file, String path, String value, boolean selfHostBase)
-            throws ConfigException {
-        URI uri;
-        try {
-            uri = new URI(value);
-        } catch (URISyntaxException exception) {
-            throw new ConfigException(file, path, "URL 格式无效：" + exception.getMessage(), exception);
-        }
-        String scheme = uri.getScheme();
-        if (!uri.isAbsolute() || scheme == null
-                || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))
-                || uri.getHost() == null || uri.getHost().isBlank()) {
-            throw error(file, path, "需要包含有效主机名的 HTTP 或 HTTPS URL");
-        }
-        if (uri.getFragment() != null) {
-            throw error(file, path, "资源包 URL 不能包含 #fragment");
-        }
-        if (selfHostBase && (uri.getQuery() != null
-                || (uri.getPath() != null && !uri.getPath().isEmpty() && !uri.getPath().equals("/")))) {
-            throw error(file, path, "SELFHOST 基础地址不能包含路径或查询参数；只填写协议、主机和可选端口");
-        }
     }
 
     private String relative(Path path) {

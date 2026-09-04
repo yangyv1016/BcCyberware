@@ -2,6 +2,16 @@
 
 本项目遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## v0.0.6 - 2026-09-05
+
+- 删除错误引入的 ResourcePackManager、SELFHOST 与 EXTERNAL 部署链路；
+- 将 Oraxen 改为运行时硬依赖，通过官方 `OraxenPackGeneratedEvent` 把全部义体 `assets/`
+  注入 Oraxen 的单一最终资源包；
+- 生成完成后调用 `OraxenPack.reloadPack()`，并在 Oraxen 启动生成尚未结束时自动重试；
+- 最终 ZIP、上传、SHA-1、强制加载、提示语与玩家进服下发全部由 Oraxen 唯一负责；
+- 玩家资源包重发继续交由 Oraxen，BcCyberware 不依赖其内部非公开 sender；
+- 新增注入内容筛选测试，确保仅传入 `assets/`，不会覆盖 Oraxen 的 `pack.mcmeta` 或图标。
+
 ## v0.0.5 - 2026-09-05
 
 - 修正 ResourcePackManager 2.3.1 首次注册后的真实合并兼容性：注册后不再立刻调用其全量重载，避免新资源尚未暂存就被重载流程清空监视状态；

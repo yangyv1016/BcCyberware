@@ -14,9 +14,8 @@
 - 可关闭的容量系统，支持固定值、玩家永久值、权限、计分板、mcMMO 与 PlaceholderAPI 数值源；
 - 件数、已用容量、容量百分比三类周期阈值；
 - 通用触发器、条件和动作；
-- 类 MythicCrucible 的 Pack Assets 合并与资源包生成；推荐注册给 ResourcePackManager，
-  由全服统一合并、托管并只下发一个最终资源包；
-- 保留 SELFHOST/EXTERNAL 独立模式，使用 Paper/Adventure 单包替换请求；
+- 类 MythicCrucible 的 Pack Assets 合并与资源包生成；
+- 通过 Oraxen 官方生成事件把全部义体资源注入其最终包，由 Oraxen 唯一负责上传和下发；
 - 原创默认器官材质与示例义体资源包。
 
 ## 构建
@@ -25,21 +24,21 @@
 .\gradlew.bat clean test build
 ```
 
-产物位于 `build/libs/BcCyberware-0.0.5.jar`。首次启动后，默认配置和核心 Pack 的 Assets 会释放到 `plugins/BcCyberware/`；插件不会在读取或重载时回写 YAML，因此服主注释不会被清除。
+产物位于 `build/libs/BcCyberware-0.0.6.jar`。首次启动后，默认配置和核心 Pack 的 Assets 会释放到 `plugins/BcCyberware/`；插件不会在读取或重载时回写 YAML，因此服主注释不会被清除。
 
 ## 资源包部署
 
-推荐把 [ResourcePackManager 2.3.1 或更新版本](https://nightbreak.io/plugin/resourcepackmanager/)
-与本插件 JAR
-一起放入服务端 `plugins/`，再将 `plugins/BcCyberware/resources.yml` 中
-`deployment.enabled` 设为 `true`、保持 `type: RESOURCE_PACK_MANAGER`。义体资源仍放在
-`plugins/BcCyberware/packs/<Pack ID>/Assets/`；生成的
-`plugins/BcCyberware/Generation/resource_pack.zip` 会自动注册给统一管理器，不需要手动搬到
-ResourcePackManager 目录，也不需要给 BcCyberware 填直链或开放 8168 端口。
+Oraxen 是运行时硬依赖。义体资源放在
+`plugins/BcCyberware/packs/<Pack ID>/Assets/`，BcCyberware 会先按内容 Pack 优先级合并，
+然后在 `OraxenPackGeneratedEvent` 中把 `assets/` 文件加入 Oraxen 的输出列表，并调用
+`OraxenPack.reloadPack()` 触发最终构建。BcCyberware 不监听 HTTP 端口、不配置下载直链、
+也不调用 Paper API 另发一份包；最终 ZIP、上传、SHA-1、提示语、强制加载和玩家进服发送
+均使用 `plugins/Oraxen/settings.yml` 中 Oraxen 自己的配置。
 
-ResourcePackManager 会把所有插件来源合成一个最终资源包并统一下发。请在它的配置中管理
-公网托管、进服发送、强制加载和提示语，并按需把 `BcCyberware` 加入 `priorityOrder`。
-GitHub Releases 页面上的旧 0.0.2 预发布包不含本插件使用的公开 API，请勿安装该旧包。
+默认器官材质也走同一注入链路。生成后的
+`plugins/BcCyberware/Generation/resource_pack.zip` 只是 BcCyberware 的中间产物，
+不用复制到 Oraxen 目录。发生同路径冲突时，BcCyberware 注入的文件覆盖 Oraxen 输出列表中
+已经存在的同路径文件；建议继续使用独立的 `bccyberware` 命名空间避免冲突。
 
 ## 主要命令
 
@@ -50,7 +49,7 @@ GitHub Releases 页面上的旧 0.0.2 预发布包不含本插件使用的公开
 - `/bccyberware inspect`：查看手中义体的内部标识。
 - `/bccyberware pack`：列出已加载的内容 Pack；
 - `/bccyberware resourcepack generate`：合并 Pack Assets 与 `Generation/merge` 并生成资源包；
-- `/bccyberware resourcepack [玩家]`：仅在 SELFHOST/EXTERNAL 独立模式下重新发送最终包；
-  统一管理模式请使用 ResourcePackManager 的重发方式。
+- `/bccyberware resourcepack [玩家]`：提示改用 Oraxen 的资源包重发功能；BcCyberware 不调用
+  Oraxen 内部非公开 sender，避免版本升级时破坏兼容性。
 
 更多服主说明见 `src/main/resources/README-配置说明.md`。

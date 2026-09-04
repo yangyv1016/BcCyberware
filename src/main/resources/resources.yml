@@ -1,5 +1,5 @@
 # ============================================================================
-# 资源包生成与部署（结构参考 MythicMobs + MythicCrucible）
+# 资源包生成与 Oraxen 注入（结构参考 MythicMobs + MythicCrucible）
 # ============================================================================
 # 每个内容 Pack 可在自己的 Assets/ 目录放置标准资源包文件，例如：
 #   plugins/BcCyberware/packs/core/Assets/assets/bccyberware/textures/item/...
@@ -12,56 +12,19 @@ generation:
   # true：每次插件启动或完整重载时在后台重新合并资源包，不阻塞服务器主线程。
   generate-on-startup: true
 
-  # 最终成品位置，相对于 plugins/BcCyberware/。
+  # BcCyberware 中间 ZIP 的位置，相对于 plugins/BcCyberware/。
+  # 它只用于整理和校验注入内容，不会直接发给玩家。
   output: "Generation/resource_pack.zip"
 
   # 服主需要强制覆盖/补充的资源放在这里；此目录最后合并，优先级最高。
   merge-directory: "Generation/merge"
 
-deployment:
-  # 首次安装默认关闭。安装并配置 ResourcePackManager 后改为 true。
-  enabled: false
+oraxen:
+  # true：把 BcCyberware 生成的 assets/ 文件注入 Oraxen 的最终资源包。
+  # 本插件不再自行监听 HTTP 端口，也不会单独向玩家发送第二份资源包。
+  # Oraxen 是运行时硬依赖；它负责最终 ZIP、上传、SHA-1、提示和进服自动下发。
+  enabled: true
 
-  # RESOURCE_PACK_MANAGER（推荐）：把本地成品注册给 ResourcePackManager。
-  #   由它与其他插件资源合并成一个最终服务器包，再统一托管和发送。
-  #   此模式下 BcCyberware 不开下载端口，也不会向玩家单独发送第二个包。
-  # SELFHOST：独立模式。BcCyberware 托管并独占下发一个最终 ZIP。
-  # EXTERNAL：独立模式。BcCyberware 下发你自行托管的一个最终 ZIP。
-  # SELFHOST/EXTERNAL 都要求你先把其他插件资源合入 Pack Assets 或 Generation/merge；
-  # 不要再让 server.properties 或其他插件同时下发另一份资源包。
-  type: RESOURCE_PACK_MANAGER
-
-  self-hosting:
-    # 以下两项仅 SELFHOST 使用。监听所有网卡，一般无需修改。
-    bind-address: "0.0.0.0"
-
-    # SELFHOST 必须在服务器面板/防火墙中放行 TCP；不能与 Minecraft 端口重复。
-    port: 8168
-
-  auto-send:
-    # 以下字段只用于 SELFHOST/EXTERNAL。RESOURCE_PACK_MANAGER 模式完全忽略它们，
-    # 是否进服发送、是否强制、提示文本和公网地址只由 ResourcePackManager 配置决定。
-    # true：独立模式下，玩家加入后自动弹出并下载最终资源包。
-    enabled: true
-
-    # true：管理员重新生成资源包后，立即推送给所有在线玩家。
-    send-on-update: true
-
-    # RESOURCE_PACK_MANAGER 时保持留空。
-    # SELFHOST 时填写玩家能访问的协议、服务器公网 IP/域名和上面的端口。
-    # 示例：http://你的服务器公网域名:8168
-    # EXTERNAL 时填写最终 ZIP 的完整直链。
-    # 首次安装保持留空；填写完成后还要把 deployment.enabled 改为 true。
-    public-url: ""
-
-    # 仅 EXTERNAL 使用：填写已经上传到 public-url 的 ZIP 的 SHA-1。
-    # 先执行 generate，上传 Generation/resource_pack.zip，再更新此值并 reload。
-    # SELFHOST 会自动计算哈希，这里保持留空。
-    sha1: ""
-
-    # 同一个逻辑资源包保持 UUID 不变；更新内容时插件会自动计算新的 SHA-1。
-    uuid: "b5c9a5c4-a607-4b35-92a3-81d0b40915a2"
-
-    # true：玩家拒绝资源包时由客户端断开连接。
-    force: true
-    prompt: "<aqua>BcCyberware 需要加载义体外观资源包。"
+  # true：BcCyberware 启动、重载或重新生成后，调用 OraxenPack.reloadPack()。
+  # Oraxen 完成新包生成后会继续使用自身 settings.yml 中的上传与 dispatch 配置。
+  reload-after-generation: true

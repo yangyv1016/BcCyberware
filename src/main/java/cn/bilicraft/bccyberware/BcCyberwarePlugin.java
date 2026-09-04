@@ -56,14 +56,14 @@ public final class BcCyberwarePlugin extends JavaPlugin {
         effects = new EffectEngine(this, configs, profiles, capacity, items, text);
         MenuService menus = new MenuService(configs, profiles, items, capacity, effects, text);
         resourcePacks = new ResourcePackService(this, configs, text);
-        if (!resourcePacks.start()) {
-            getLogger().warning("义体功能继续运行，但资源包生成或部署当前不可用。请检查 resources.yml 和端口占用。 ");
-        }
         CyberwareEventListener events = new CyberwareEventListener(this, profiles, capacity, effects);
 
         Bukkit.getPluginManager().registerEvents(events, this);
         Bukkit.getPluginManager().registerEvents(menus, this);
         Bukkit.getPluginManager().registerEvents(resourcePacks, this);
+        if (!resourcePacks.start()) {
+            getLogger().warning("义体功能继续运行，但资源包生成或 Oraxen 注入当前不可用。请检查 resources.yml。 ");
+        }
         profiles.onLoaded(effects::reconcilePassives);
 
         CyberwareCommand executor = new CyberwareCommand(

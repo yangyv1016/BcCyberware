@@ -6,7 +6,6 @@ import java.util.Map;
 public record ConfigSnapshot(
         int schemaVersion,
         boolean createDefaultOrgans,
-        long resourcePackDelayTicks,
         long effectEngineTick,
         long saveDebounceTicks,
         String databaseFile,
@@ -33,7 +32,6 @@ public record ConfigSnapshot(
         return new ConfigSnapshot(
                 schemaVersion,
                 createDefaultOrgans,
-                resourcePackDelayTicks,
                 effectEngineTick,
                 saveDebounceTicks,
                 databaseFile,

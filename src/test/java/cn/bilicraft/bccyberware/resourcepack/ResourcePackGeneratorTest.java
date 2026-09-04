@@ -3,7 +3,6 @@ package cn.bilicraft.bccyberware.resourcepack;
 import cn.bilicraft.bccyberware.config.model.ConfigSnapshot;
 import cn.bilicraft.bccyberware.config.model.PackDefinition;
 import cn.bilicraft.bccyberware.config.model.ResourcePackDeploymentSettings;
-import cn.bilicraft.bccyberware.config.model.ResourcePackDeploymentType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -16,7 +15,6 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -140,21 +138,11 @@ class ResourcePackGeneratorTest {
                 "Generation/resource_pack.zip",
                 "Generation/merge",
                 true,
-                ResourcePackDeploymentType.SELFHOST,
-                "127.0.0.1",
-                8168,
-                "http://127.0.0.1:8168",
-                new byte[0],
-                true,
-                true,
-                UUID.fromString("b5c9a5c4-a607-4b35-92a3-81d0b40915a2"),
-                true,
-                "test"
+                true
         );
         return new ConfigSnapshot(
                 1,
                 true,
-                20,
                 10,
                 40,
                 "data/players.db",

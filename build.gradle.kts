@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "cn.bilicraft"
-version = "0.0.5"
+version = "0.0.6"
 val pluginVersion = version.toString()
 
 repositories {
@@ -12,10 +12,15 @@ repositories {
         name = "papermc"
         url = uri("https://repo.papermc.io/repository/maven-public/")
     }
+    maven {
+        name = "oraxen"
+        url = uri("https://repo.oraxen.com/releases")
+    }
 }
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    compileOnly("io.th0rgal:oraxen:1.218.0")
 
     implementation("org.xerial:sqlite-jdbc:3.50.3.0")
 

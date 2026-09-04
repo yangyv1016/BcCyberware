@@ -1,7 +1,6 @@
 package cn.bilicraft.bccyberware.config;
 
 import cn.bilicraft.bccyberware.config.model.ConfigSnapshot;
-import cn.bilicraft.bccyberware.config.model.ResourcePackDeploymentType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -10,7 +9,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -28,10 +26,8 @@ class ConfigLoaderTest {
         assertEquals("LEFT_LEG", snapshot.slots().get("core:left-leg").type());
         assertEquals("RIGHT_LEG", snapshot.slots().get("core:right-leg").type());
         assertTrue(snapshot.resourcePackDeployment().generationEnabled());
-        assertFalse(snapshot.resourcePackDeployment().deploymentEnabled());
-        assertEquals(ResourcePackDeploymentType.RESOURCE_PACK_MANAGER, snapshot.resourcePackDeployment().type());
-        assertEquals(8168, snapshot.resourcePackDeployment().port());
-        assertEquals("", snapshot.resourcePackDeployment().publicUrl());
+        assertTrue(snapshot.resourcePackDeployment().oraxenIntegrationEnabled());
+        assertTrue(snapshot.resourcePackDeployment().reloadOraxenAfterGeneration());
     }
 
     @Test
@@ -131,63 +127,6 @@ class ConfigLoaderTest {
     }
 
     @Test
-    void requiresSha1ForEnabledExternalDeployment() throws Exception {
-        writeBaseFiles();
-        write("packs/core/pack.yml", "id: core\nenabled: true\npriority: 0\n");
-        write("resources.yml", """
-                generation:
-                  enabled: false
-                deployment:
-                  enabled: true
-                  type: EXTERNAL
-                  auto-send:
-                    public-url: https://cdn.example.test/resource_pack.zip
-                    sha1: ""
-                """);
-
-        ConfigException exception = assertThrows(ConfigException.class, () -> new ConfigLoader(directory).load());
-        assertTrue(exception.getMessage().contains("EXTERNAL 部署需要填写"), exception::getMessage);
-    }
-
-    @Test
-    void rejectsSelfHostBaseUrlWithPathOrQuery() throws Exception {
-        writeBaseFiles();
-        write("packs/core/pack.yml", "id: core\nenabled: true\npriority: 0\n");
-        write("resources.yml", """
-                generation:
-                  enabled: true
-                deployment:
-                  enabled: true
-                  type: SELFHOST
-                  auto-send:
-                    public-url: https://packs.example.test/proxy?token=unsafe
-                """);
-
-        ConfigException exception = assertThrows(ConfigException.class, () -> new ConfigLoader(directory).load());
-        assertTrue(exception.getMessage().contains("不能包含路径或查询参数"), exception::getMessage);
-    }
-
-    @Test
-    void resourcePackManagerDoesNotRequirePublicUrl() throws Exception {
-        writeBaseFiles();
-        write("packs/core/pack.yml", "id: core\nenabled: true\npriority: 0\n");
-        write("resources.yml", """
-                generation:
-                  enabled: true
-                deployment:
-                  enabled: true
-                  type: RESOURCE_PACK_MANAGER
-                  auto-send:
-                    public-url: ""
-                """);
-
-        ConfigSnapshot snapshot = new ConfigLoader(directory).load();
-        assertTrue(snapshot.resourcePackDeployment().deploymentEnabled());
-        assertEquals(ResourcePackDeploymentType.RESOURCE_PACK_MANAGER,
-                snapshot.resourcePackDeployment().type());
-    }
-
-    @Test
     void rejectsLegacyExternalPackList() throws Exception {
         writeBaseFiles();
         write("packs/core/pack.yml", "id: core\nenabled: true\npriority: 0\n");
@@ -227,7 +166,6 @@ class ConfigLoaderTest {
         write("config.yml", """
                 schema-version: 1
                 general:
-                  resource-pack-delay: 1s
                   effect-engine-tick: 10t
                   save-debounce: 2s
                 gui:

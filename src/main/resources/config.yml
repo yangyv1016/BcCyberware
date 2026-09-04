@@ -16,9 +16,6 @@ general:
   # 是否在玩家首次建立义体数据时，自动生成并安装 slots.yml 中指定的原生器官。
   create-default-organs: true
 
-  # 玩家加入后延迟多少时间发送资源包。0s 表示立即发送。
-  resource-pack-delay: 1s
-
   # 周期能力、空部位缺点与容量阈值的统一扫描频率。
   # 这里不是每个效果的实际触发间隔；实际间隔由各条规则自己的 interval 决定。
   # 推荐保持 10t～20t，过低会增加服务器负担。
@@ -169,4 +166,3 @@ logging:
 
   # true 时输出周期引擎的详细调试信息。正式服建议保持 false。
   debug-effects: false
-
