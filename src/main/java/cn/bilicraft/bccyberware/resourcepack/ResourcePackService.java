@@ -17,8 +17,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -50,20 +48,6 @@ public final class ResourcePackService implements Listener {
     }
 
     public boolean start() {
-        ResourcePackDeploymentSettings settings = configs.current().resourcePackDeployment();
-        if (settings.deploymentEnabled()
-                && settings.type() == ResourcePackDeploymentType.RESOURCE_PACK_MANAGER) {
-            Path existing = plugin.getDataFolder().toPath().resolve(settings.outputFile()).normalize();
-            if (Files.isRegularFile(existing)) {
-                try {
-                    managerBridge.register(existing);
-                    plugin.getLogger().info("启动阶段已向 ResourcePackManager 注册现有 BcCyberware 资源包。");
-                } catch (IOException exception) {
-                    plugin.getLogger().warning("启动阶段无法注册现有资源包，将在生成完成后重试："
-                            + exception.getMessage());
-                }
-            }
-        }
         return scheduleDeployment(true, null);
     }
 
@@ -181,10 +165,10 @@ public final class ResourcePackService implements Listener {
                 if (prepared.candidate() == null) {
                     throw new IOException("RESOURCE_PACK_MANAGER 没有可注册的本地资源包");
                 }
-                managerBridge.registerAndReload(prepared.candidate().file());
+                managerBridge.register(prepared.candidate().file());
                 selfHost.close();
                 plugin.getLogger().info("已将 " + prepared.candidate().file().getFileName()
-                        + " 注册给 ResourcePackManager；最终资源包由统一管理器合并、托管并下发。");
+                        + " 注册给 ResourcePackManager；等待其稳定检测后统一合并、托管并下发。");
             } else {
                 selfHost.close();
             }
@@ -312,8 +296,9 @@ public final class ResourcePackService implements Listener {
                             }
                             if (currentState.ready() && active != null
                                     && active.type() == ResourcePackDeploymentType.RESOURCE_PACK_MANAGER) {
-                                managerBridge.registerAndReload(prepared.candidate().file());
-                                plugin.getLogger().info("ResourcePackManager 已重新合并 BcCyberware 的最新资源。");
+                                managerBridge.register(prepared.candidate().file());
+                                plugin.getLogger().info("已更新 ResourcePackManager 的 BcCyberware 资源源；"
+                                        + "统一管理器将在稳定检测后重新合并。");
                             }
                             state = new DeploymentState(active, prepared.candidate(), currentState.ready());
                             plugin.getLogger().info("资源包已生成：" + prepared.candidate().file()

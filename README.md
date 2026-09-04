@@ -25,11 +25,12 @@
 .\gradlew.bat clean test build
 ```
 
-产物位于 `build/libs/BcCyberware-0.0.4.jar`。首次启动后，默认配置和核心 Pack 的 Assets 会释放到 `plugins/BcCyberware/`；插件不会在读取或重载时回写 YAML，因此服主注释不会被清除。
+产物位于 `build/libs/BcCyberware-0.0.5.jar`。首次启动后，默认配置和核心 Pack 的 Assets 会释放到 `plugins/BcCyberware/`；插件不会在读取或重载时回写 YAML，因此服主注释不会被清除。
 
 ## 资源包部署
 
-推荐把 [ResourcePackManager](https://github.com/MagmaGuy/ResourcePackManager) 与本插件 JAR
+推荐把 [ResourcePackManager 2.3.1 或更新版本](https://nightbreak.io/plugin/resourcepackmanager/)
+与本插件 JAR
 一起放入服务端 `plugins/`，再将 `plugins/BcCyberware/resources.yml` 中
 `deployment.enabled` 设为 `true`、保持 `type: RESOURCE_PACK_MANAGER`。义体资源仍放在
 `plugins/BcCyberware/packs/<Pack ID>/Assets/`；生成的
@@ -38,6 +39,7 @@ ResourcePackManager 目录，也不需要给 BcCyberware 填直链或开放 8168
 
 ResourcePackManager 会把所有插件来源合成一个最终资源包并统一下发。请在它的配置中管理
 公网托管、进服发送、强制加载和提示语，并按需把 `BcCyberware` 加入 `priorityOrder`。
+GitHub Releases 页面上的旧 0.0.2 预发布包不含本插件使用的公开 API，请勿安装该旧包。
 
 ## 主要命令
 

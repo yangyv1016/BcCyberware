@@ -1,7 +1,9 @@
-# BcCyberware v0.0.4 交付包
+# BcCyberware v0.0.5 交付包
 
 1. 确认服务端为 Paper 1.21.11，使用 Java 21。
-2. 将 `BcCyberware-0.0.4.jar` 和 ResourcePackManager 放入服务端 `plugins/`。
+2. 将 `BcCyberware-0.0.5.jar` 和
+   [ResourcePackManager 2.3.1 或更新版本](https://nightbreak.io/plugin/resourcepackmanager/)
+   放入服务端 `plugins/`。不要使用 GitHub Releases 中不含公开 API 的旧 0.0.2 预发布包。
 3. 首次启动后编辑 `plugins/BcCyberware/` 中的带注释配置。
 4. 默认材质会自动释放到 `packs/core/Assets/`，并生成到
    `Generation/resource_pack.zip`。

@@ -21,21 +21,7 @@ final class ResourcePackManagerBridge {
         this.plugin = plugin;
     }
 
-    void registerAndReload(Path resourcePack) throws IOException {
-        Class<?> api = register(resourcePack);
-        try {
-            api.getMethod("reloadResourcePack").invoke(null);
-        } catch (NoSuchMethodException exception) {
-            throw new IOException("已安装的 ResourcePackManager 不包含重载 API，请升级该插件", exception);
-        } catch (IllegalAccessException exception) {
-            throw new IOException("无法访问 ResourcePackManager 的重载 API", exception);
-        } catch (InvocationTargetException exception) {
-            Throwable cause = exception.getCause() == null ? exception : exception.getCause();
-            throw new IOException("ResourcePackManager 合并或重载失败：" + cause.getMessage(), cause);
-        }
-    }
-
-    Class<?> register(Path resourcePack) throws IOException {
+    void register(Path resourcePack) throws IOException {
         if (!Files.isRegularFile(resourcePack)) {
             throw new IOException("准备注册给 ResourcePackManager 的资源包不存在：" + resourcePack);
         }
@@ -57,7 +43,6 @@ final class ResourcePackManagerBridge {
                     String.class
             );
             register.invoke(null, plugin.getName(), localPath, false, false, true, RELOAD_COMMAND);
-            return api;
         } catch (ClassNotFoundException | NoSuchMethodException exception) {
             throw new IOException("已安装的 ResourcePackManager 不包含兼容的公开 API，请升级该插件", exception);
         } catch (IllegalAccessException exception) {

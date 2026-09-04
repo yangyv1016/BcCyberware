@@ -207,7 +207,8 @@ plugins/BcCyberware/packs/example/Assets/
 插件在后台按 Pack 的 `priority` 合并这些目录，再用 `Generation/merge/` 中的服主文件执行
 最终覆盖，输出为 `Generation/resource_pack.zip`。
 
-推荐安装 ResourcePackManager，并在 `resources.yml` 使用：
+推荐从 Nightbreak 安装 ResourcePackManager 2.3.1 或更新版本，并在 `resources.yml` 使用。
+不要使用其 GitHub Releases 页面上的旧 0.0.2 预发布包，该旧包不含所需公开 API：
 
 ```yaml
 deployment:
@@ -220,6 +221,11 @@ BcCyberware 会通过 ResourcePackManager 的公开 API 注册相对于 `plugins
 强制加载、提示语和重发。此模式下 BcCyberware 不监听 8168，不读取 `public-url`，
 也绝不会再向玩家单独发送第二个包。相关发送选项只在 ResourcePackManager 中配置，
 避免两套配置同时成为权限来源。
+
+注册或重新生成后，BcCyberware 不会强制重启 ResourcePackManager；它会让统一管理器自带的
+文件稳定监视器完成暂存和重新合并。这样兼容 ResourcePackManager 2.3.1 的初始化顺序，
+也避免资源刚注册、尚未暂存就被全量重载清掉监视状态。等待数秒后可用 `/rspm status`
+确认最终包状态。
 
 如需决定同名模型、纹理发生冲突时谁覆盖谁，请把插件名 `BcCyberware` 加入
 `plugins/ResourcePackManager/config.yml` 的 `priorityOrder`；未列出时会按

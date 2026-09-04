@@ -2,6 +2,12 @@
 
 本项目遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## v0.0.5 - 2026-09-05
+
+- 修正 ResourcePackManager 2.3.1 首次注册后的真实合并兼容性：注册后不再立刻调用其全量重载，避免新资源尚未暂存就被重载流程清空监视状态；
+- 改由 ResourcePackManager 自带的资源变化监视器等待文件稳定后暂存、合并和下发；
+- 已在 Paper 1.21.11 + ResourcePackManager 2.3.1 的真实服务端组合上核验最终合并 ZIP。
+
 ## v0.0.4 - 2026-09-05
 
 - 修正资源包架构：移除 BcCyberware 逐个发送生成包和额外外部包的旧路径；
