@@ -27,6 +27,7 @@ permissions:
       bccyberware.admin.capacity: true
       bccyberware.admin.reload: true
       bccyberware.admin.inspect: true
+      bccyberware.admin.resourcepack: true
   bccyberware.admin.give:
     default: op
   bccyberware.admin.capacity:
@@ -34,4 +35,6 @@ permissions:
   bccyberware.admin.reload:
     default: op
   bccyberware.admin.inspect:
+    default: op
+  bccyberware.admin.resourcepack:
     default: op

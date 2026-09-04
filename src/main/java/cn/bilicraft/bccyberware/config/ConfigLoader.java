@@ -8,6 +8,8 @@ import cn.bilicraft.bccyberware.config.model.GuiSettings;
 import cn.bilicraft.bccyberware.config.model.ItemDefinition;
 import cn.bilicraft.bccyberware.config.model.PackDefinition;
 import cn.bilicraft.bccyberware.config.model.ResourcePackSpec;
+import cn.bilicraft.bccyberware.config.model.ResourcePackDeploymentSettings;
+import cn.bilicraft.bccyberware.config.model.ResourcePackDeploymentType;
 import cn.bilicraft.bccyberware.config.model.SlotDefinition;
 import cn.bilicraft.bccyberware.config.model.ThresholdRule;
 import cn.bilicraft.bccyberware.config.model.TriggerSpec;
@@ -22,6 +24,8 @@ import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
@@ -102,7 +106,10 @@ final class ConfigLoader {
                 thresholds
         );
 
-        ResourcePackLoadResult resourcePacks = activeResourcePacks(loadResourcePacks(), orderedPacks);
+        YamlConfiguration resourcePackYaml = yaml(dataDirectory.resolve("resources.yml"), "resources.yml");
+        ResourcePackDeploymentSettings resourcePackDeployment = loadResourcePackDeployment(resourcePackYaml);
+        ResourcePackLoadResult resourcePacks = activeResourcePacks(loadResourcePacks(resourcePackYaml), orderedPacks);
+        validateResourcePackUuids(resourcePackDeployment, resourcePacks);
         Map<String, String> messages = loadMessages();
 
         return new ConfigSnapshot(
@@ -119,6 +126,7 @@ final class ConfigLoader {
                 packs,
                 slots,
                 items,
+                resourcePackDeployment,
                 resourcePacks.enabled,
                 resourcePacks.packs,
                 messages
@@ -483,15 +491,109 @@ final class ConfigLoader {
         }
     }
 
-    private ResourcePackLoadResult loadResourcePacks() throws ConfigException {
+    private ResourcePackDeploymentSettings loadResourcePackDeployment(YamlConfiguration yaml) throws ConfigException {
         String file = "resources.yml";
-        YamlConfiguration yaml = yaml(dataDirectory.resolve(file), file);
-        boolean enabled = yaml.getBoolean("enabled", false);
+        boolean deploymentConfigured = yaml.isConfigurationSection("generation")
+                || yaml.isConfigurationSection("deployment");
+        String outputFile = yaml.getString("generation.output", "Generation/resource_pack.zip");
+        String mergeDirectory = yaml.getString("generation.merge-directory", "Generation/merge");
+        Path outputPath = validateDataPath(file, "generation.output", outputFile, false);
+        Path mergePath = validateDataPath(file, "generation.merge-directory", mergeDirectory, true);
+        if (mergePath.equals(dataDirectory.normalize()) || outputPath.startsWith(mergePath)) {
+            throw error(file, "generation.merge-directory",
+                    "合并目录不能是插件数据根目录，也不能包含 generation.output，否则会把旧 ZIP 递归打入新包");
+        }
+        Path normalizedDataDirectory = dataDirectory.normalize();
+        if (outputPath.startsWith(normalizedDataDirectory.resolve("packs"))) {
+            throw error(file, "generation.output",
+                    "生成结果不能放在 packs 目录内，否则下次生成会把旧 ZIP 打进新包");
+        }
+        if (outputPath.startsWith(normalizedDataDirectory.resolve(".runtime"))) {
+            throw error(file, "generation.output",
+                    "生成结果不能放在插件内部使用的 .runtime 目录内");
+        }
+
+        ResourcePackDeploymentType type = enumValue(
+                ResourcePackDeploymentType.class,
+                yaml.getString("deployment.type", "SELFHOST"),
+                file,
+                "deployment.type"
+        );
+        int port = integer(yaml, file, "deployment.self-hosting.port", 8168, 1, 65535);
+        String publicUrl = yaml.getString("deployment.auto-send.public-url", "").trim();
+        boolean deploymentEnabled = yaml.getBoolean("deployment.enabled", false);
+        boolean autoSendEnabled = yaml.getBoolean("deployment.auto-send.enabled", true);
+        if (deploymentEnabled && publicUrl.isEmpty()) {
+            throw error(file, "deployment.auto-send.public-url",
+                    "启用部署时需要填写玩家可访问的 http:// 或 https:// 地址");
+        }
+        if (!publicUrl.isEmpty()) {
+            validateHttpUrl(file, "deployment.auto-send.public-url", publicUrl,
+                    type == ResourcePackDeploymentType.SELFHOST);
+        }
+        String externalHash = yaml.getString("deployment.auto-send.sha1", "").trim();
+        if (type == ResourcePackDeploymentType.EXTERNAL && deploymentEnabled
+                && !externalHash.matches("[0-9a-fA-F]{40}")) {
+            throw error(file, "deployment.auto-send.sha1",
+                    "EXTERNAL 部署需要填写已上传 ZIP 的 40 位十六进制 SHA-1");
+        }
+        if (!externalHash.isEmpty() && !externalHash.matches("[0-9a-fA-F]{40}")) {
+            throw error(file, "deployment.auto-send.sha1", "需要 40 位十六进制 SHA-1，或保持留空");
+        }
+
+        UUID uuid;
+        try {
+            uuid = UUID.fromString(yaml.getString(
+                    "deployment.auto-send.uuid",
+                    "b5c9a5c4-a607-4b35-92a3-81d0b40915a2"
+            ));
+        } catch (IllegalArgumentException exception) {
+            throw new ConfigException(file, "deployment.auto-send.uuid", "需要标准 UUID", exception);
+        }
+
+        return new ResourcePackDeploymentSettings(
+                yaml.getBoolean("generation.enabled", deploymentConfigured),
+                yaml.getBoolean("generation.generate-on-startup", true),
+                outputFile,
+                mergeDirectory,
+                deploymentEnabled,
+                type,
+                yaml.getString("deployment.self-hosting.bind-address", "0.0.0.0").trim(),
+                port,
+                publicUrl,
+                externalHash.isEmpty() ? new byte[0] : hex(externalHash),
+                autoSendEnabled,
+                yaml.getBoolean("deployment.auto-send.send-on-update", true),
+                uuid,
+                yaml.getBoolean("deployment.auto-send.force", true),
+                yaml.getString("deployment.auto-send.prompt", "<aqua>BcCyberware 需要加载义体外观资源包。")
+        );
+    }
+
+    private Path validateDataPath(String file, String path, String value, boolean directory) throws ConfigException {
+        if (value == null || value.isBlank()) {
+            throw error(file, path, "路径不能为空");
+        }
+        Path resolved = dataDirectory.resolve(value).normalize();
+        if (!resolved.startsWith(dataDirectory.normalize())) {
+            throw error(file, path, "路径必须位于插件数据目录内");
+        }
+        if (!directory && !value.toLowerCase(Locale.ROOT).endsWith(".zip")) {
+            throw error(file, path, "生成结果必须是 .zip 文件");
+        }
+        return resolved;
+    }
+
+    private ResourcePackLoadResult loadResourcePacks(YamlConfiguration yaml) throws ConfigException {
+        String file = "resources.yml";
+        boolean modernLayout = yaml.isConfigurationSection("external-packs");
+        String root = modernLayout ? "external-packs" : "";
+        boolean enabled = yaml.getBoolean(modernLayout ? root + ".enabled" : "enabled", false);
         List<ResourcePackSpec> packs = new ArrayList<>();
         Set<String> ids = new HashSet<>();
-        List<Map<?, ?>> maps = yaml.getMapList("packs");
+        List<Map<?, ?>> maps = yaml.getMapList(modernLayout ? root + ".packs" : "packs");
         for (int index = 0; index < maps.size(); index++) {
-            String path = "packs[" + index + "]";
+            String path = (modernLayout ? "external-packs.packs[" : "packs[") + index + "]";
             Map<String, Object> values = stringMap(maps.get(index));
             String id = mapString(values, "id", null);
             validateLocalId(file, path + ".id", id);
@@ -505,9 +607,7 @@ final class ConfigLoader {
                 throw new ConfigException(file, path + ".uuid", "需要标准 UUID", exception);
             }
             String url = mapString(values, "url", "");
-            if (!url.matches("https?://.+")) {
-                throw error(file, path + ".url", "需要客户端可直接下载的 HTTP 或 HTTPS URL");
-            }
+            validateHttpUrl(file, path + ".url", url, false);
             String hash = mapString(values, "sha1", "");
             if (!hash.matches("[0-9a-fA-F]{40}")) {
                 throw error(file, path + ".sha1", "需要 40 位十六进制 SHA-1");
@@ -550,6 +650,22 @@ final class ConfigLoader {
                 .filter(pack -> requested.contains(pack.id()))
                 .toList();
         return new ResourcePackLoadResult(true, selected);
+    }
+
+    private void validateResourcePackUuids(
+            ResourcePackDeploymentSettings deployment,
+            ResourcePackLoadResult external
+    ) throws ConfigException {
+        Set<UUID> uuids = new HashSet<>();
+        if (deployment.deploymentEnabled()) {
+            uuids.add(deployment.uuid());
+        }
+        for (ResourcePackSpec pack : external.packs()) {
+            if (!uuids.add(pack.uuid())) {
+                throw error("resources.yml", "external-packs.packs",
+                        "生成资源包与额外外部资源包的 UUID 必须各不相同，重复值：" + pack.uuid());
+            }
+        }
     }
 
     private Map<String, String> loadMessages() throws ConfigException {
@@ -859,6 +975,29 @@ final class ConfigLoader {
             bytes[index] = (byte) Integer.parseInt(value.substring(index * 2, index * 2 + 2), 16);
         }
         return bytes;
+    }
+
+    private static void validateHttpUrl(String file, String path, String value, boolean selfHostBase)
+            throws ConfigException {
+        URI uri;
+        try {
+            uri = new URI(value);
+        } catch (URISyntaxException exception) {
+            throw new ConfigException(file, path, "URL 格式无效：" + exception.getMessage(), exception);
+        }
+        String scheme = uri.getScheme();
+        if (!uri.isAbsolute() || scheme == null
+                || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))
+                || uri.getHost() == null || uri.getHost().isBlank()) {
+            throw error(file, path, "需要包含有效主机名的 HTTP 或 HTTPS URL");
+        }
+        if (uri.getFragment() != null) {
+            throw error(file, path, "资源包 URL 不能包含 #fragment");
+        }
+        if (selfHostBase && (uri.getQuery() != null
+                || (uri.getPath() != null && !uri.getPath().isEmpty() && !uri.getPath().equals("/")))) {
+            throw error(file, path, "SELFHOST 基础地址不能包含路径或查询参数；只填写协议、主机和可选端口");
+        }
     }
 
     private String relative(Path path) {

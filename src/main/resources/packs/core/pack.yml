@@ -20,7 +20,6 @@ depends: []
 soft-depends: []
 allow-overrides: false
 
-# 可选：本 Pack 需要玩家同时加载的 resources.yml 资源包 ID。
-# 对应资源包仍在插件根目录 resources.yml 中声明 URL、SHA-1 和强制策略。
-resource-packs:
-  - bccyberware-default
+# 本 Pack 的客户端资源位于同目录的 Assets/。
+# /bccyberware resourcepack generate 会将所有启用 Pack 的 Assets 按优先级合并。
+resource-packs: []

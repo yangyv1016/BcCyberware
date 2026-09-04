@@ -1,11 +1,22 @@
 package cn.bilicraft.bccyberware.config;
 
 import cn.bilicraft.bccyberware.config.model.ConfigSnapshot;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public final class ConfigManager {
     private static final List<String> DEFAULT_RESOURCES = List.of(
@@ -36,11 +47,59 @@ public final class ConfigManager {
                 plugin.saveResource(resource, false);
             }
         }
+        installDefaultPackAssets();
+        warnIfLegacyResourceConfig();
+    }
+
+    private void warnIfLegacyResourceConfig() {
+        File resourceConfig = new File(plugin.getDataFolder(), "resources.yml");
+        if (!resourceConfig.isFile()) {
+            return;
+        }
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(resourceConfig);
+        if (!yaml.isConfigurationSection("generation") && !yaml.isConfigurationSection("deployment")) {
+            plugin.getLogger().warning("检测到 v0.0.1 格式的 resources.yml：旧外部 URL 配置继续兼容，"
+                    + "但 Pack Assets 生成与 SELFHOST 不会自动启用。请参考 Release 中的 v0.0.2 示例迁移。");
+        }
+    }
+
+    private void installDefaultPackAssets() {
+        Path targetRoot = plugin.getDataFolder().toPath().resolve("packs/core/Assets").normalize();
+        if (Files.isRegularFile(targetRoot.resolve("pack.mcmeta"))) {
+            return;
+        }
+        try (InputStream bundled = plugin.getResource("bundled-resourcepacks/BcCyberware-Example-Pack.zip")) {
+            if (bundled == null) {
+                plugin.getLogger().severe("插件 JAR 中缺少默认资源包，无法释放 core/Assets。");
+                return;
+            }
+            Files.createDirectories(targetRoot);
+            try (ZipInputStream zip = new ZipInputStream(bundled)) {
+                ZipEntry entry;
+                while ((entry = zip.getNextEntry()) != null) {
+                    Path target = targetRoot.resolve(entry.getName()).normalize();
+                    if (!target.startsWith(targetRoot)) {
+                        throw new IOException("默认资源包包含越界路径：" + entry.getName());
+                    }
+                    if (entry.isDirectory()) {
+                        Files.createDirectories(target);
+                    } else if (!Files.exists(target)) {
+                        Files.createDirectories(target.getParent());
+                        Files.copy(zip, target);
+                    }
+                    zip.closeEntry();
+                }
+            }
+            plugin.getLogger().info("已释放默认 Pack 资源到 plugins/BcCyberware/packs/core/Assets。");
+        } catch (IOException exception) {
+            plugin.getLogger().severe("释放默认 Pack 资源失败：" + exception.getMessage());
+        }
     }
 
     public boolean reload() {
         try {
-            ConfigSnapshot candidate = new ConfigLoader(plugin.getDataFolder().toPath()).load();
+            ConfigSnapshot candidate = new ConfigLoader(plugin.getDataFolder().toPath()).load()
+                    .withMessageFallbacks(loadBundledMessageFallbacks());
             snapshot.set(candidate);
             plugin.getLogger().info("配置加载完成：" + candidate.packs().size() + " 个 Pack、"
                     + candidate.slots().size() + " 个槽位、" + candidate.items().size() + " 个部件。 ");
@@ -57,6 +116,28 @@ public final class ConfigManager {
         }
     }
 
+    private Map<String, String> loadBundledMessageFallbacks() {
+        try (InputStream bundled = plugin.getResource("messages.yml")) {
+            if (bundled == null) {
+                plugin.getLogger().warning("插件 JAR 中缺少 messages.yml，无法为旧版消息配置提供回退文本。");
+                return Map.of();
+            }
+            YamlConfiguration yaml = YamlConfiguration.loadConfiguration(
+                    new InputStreamReader(bundled, StandardCharsets.UTF_8)
+            );
+            LinkedHashMap<String, String> result = new LinkedHashMap<>();
+            for (String key : yaml.getKeys(true)) {
+                if (yaml.isString(key)) {
+                    result.put(key, yaml.getString(key, ""));
+                }
+            }
+            return result;
+        } catch (IOException exception) {
+            plugin.getLogger().warning("读取 JAR 内置消息回退失败：" + exception.getMessage());
+            return Map.of();
+        }
+    }
+
     public ConfigSnapshot current() {
         ConfigSnapshot current = snapshot.get();
         if (current == null) {
@@ -65,4 +146,3 @@ public final class ConfigManager {
         return current;
     }
 }
-

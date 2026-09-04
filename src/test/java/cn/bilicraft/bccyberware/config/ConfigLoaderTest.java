@@ -1,6 +1,7 @@
 package cn.bilicraft.bccyberware.config;
 
 import cn.bilicraft.bccyberware.config.model.ConfigSnapshot;
+import cn.bilicraft.bccyberware.config.model.ResourcePackDeploymentType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -9,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -25,6 +27,11 @@ class ConfigLoaderTest {
         assertEquals(18, snapshot.items().size());
         assertEquals("LEFT_LEG", snapshot.slots().get("core:left-leg").type());
         assertEquals("RIGHT_LEG", snapshot.slots().get("core:right-leg").type());
+        assertTrue(snapshot.resourcePackDeployment().generationEnabled());
+        assertFalse(snapshot.resourcePackDeployment().deploymentEnabled());
+        assertEquals(ResourcePackDeploymentType.SELFHOST, snapshot.resourcePackDeployment().type());
+        assertEquals(8168, snapshot.resourcePackDeployment().port());
+        assertEquals("", snapshot.resourcePackDeployment().publicUrl());
     }
 
     @Test
@@ -87,6 +94,77 @@ class ConfigLoaderTest {
 
         ConfigException exception = assertThrows(ConfigException.class, () -> new ConfigLoader(directory).load());
         assertTrue(exception.getMessage().contains("重复类型：ARM"));
+    }
+
+    @Test
+    void rejectsGeneratedZipInsidePackAssets() throws Exception {
+        writeBaseFiles();
+        write("packs/core/pack.yml", "id: core\nenabled: true\npriority: 0\n");
+        write("resources.yml", """
+                generation:
+                  enabled: true
+                  output: packs/core/Assets/resource_pack.zip
+                  merge-directory: Generation/merge
+                deployment:
+                  enabled: false
+                """);
+
+        ConfigException exception = assertThrows(ConfigException.class, () -> new ConfigLoader(directory).load());
+        assertTrue(exception.getMessage().contains("不能放在 packs 目录内"), exception::getMessage);
+    }
+
+    @Test
+    void rejectsGeneratedZipInsideRuntimeCache() throws Exception {
+        writeBaseFiles();
+        write("packs/core/pack.yml", "id: core\nenabled: true\npriority: 0\n");
+        write("resources.yml", """
+                generation:
+                  enabled: true
+                  output: .runtime/resource_pack.zip
+                  merge-directory: Generation/merge
+                deployment:
+                  enabled: false
+                """);
+
+        ConfigException exception = assertThrows(ConfigException.class, () -> new ConfigLoader(directory).load());
+        assertTrue(exception.getMessage().contains(".runtime"), exception::getMessage);
+    }
+
+    @Test
+    void requiresSha1ForEnabledExternalDeployment() throws Exception {
+        writeBaseFiles();
+        write("packs/core/pack.yml", "id: core\nenabled: true\npriority: 0\n");
+        write("resources.yml", """
+                generation:
+                  enabled: false
+                deployment:
+                  enabled: true
+                  type: EXTERNAL
+                  auto-send:
+                    public-url: https://cdn.example.test/resource_pack.zip
+                    sha1: ""
+                """);
+
+        ConfigException exception = assertThrows(ConfigException.class, () -> new ConfigLoader(directory).load());
+        assertTrue(exception.getMessage().contains("EXTERNAL 部署需要填写"), exception::getMessage);
+    }
+
+    @Test
+    void rejectsSelfHostBaseUrlWithPathOrQuery() throws Exception {
+        writeBaseFiles();
+        write("packs/core/pack.yml", "id: core\nenabled: true\npriority: 0\n");
+        write("resources.yml", """
+                generation:
+                  enabled: true
+                deployment:
+                  enabled: true
+                  type: SELFHOST
+                  auto-send:
+                    public-url: https://packs.example.test/proxy?token=unsafe
+                """);
+
+        ConfigException exception = assertThrows(ConfigException.class, () -> new ConfigLoader(directory).load());
+        assertTrue(exception.getMessage().contains("不能包含路径或查询参数"), exception::getMessage);
     }
 
     private void writeBaseFiles() throws IOException {

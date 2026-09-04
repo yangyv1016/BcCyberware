@@ -14,7 +14,7 @@
 - 可关闭的容量系统，支持固定值、玩家永久值、权限、计分板、mcMMO 与 PlaceholderAPI 数值源；
 - 件数、已用容量、容量百分比三类周期阈值；
 - 通用触发器、条件和动作；
-- 多资源包 URL、SHA-1、加载顺序和状态反馈；
+- 类 MythicCrucible 的 Pack Assets 合并、资源包生成、SELFHOST 与自动下发；
 - 原创默认器官材质与示例义体资源包。
 
 ## 构建
@@ -23,7 +23,7 @@
 .\gradlew.bat clean test build
 ```
 
-产物位于 `build/libs/BcCyberware-0.0.1.jar`。首次启动后，默认配置会释放到 `plugins/BcCyberware/`；插件不会在读取或重载时回写 YAML，因此服主注释不会被清除。
+产物位于 `build/libs/BcCyberware-0.0.2.jar`。首次启动后，默认配置和核心 Pack 的 Assets 会释放到 `plugins/BcCyberware/`；插件不会在读取或重载时回写 YAML，因此服主注释不会被清除。
 
 ## 主要命令
 
@@ -33,6 +33,7 @@
 - `/bccyberware reload`：完整校验后原子重载配置；
 - `/bccyberware inspect`：查看手中义体的内部标识。
 - `/bccyberware pack`：列出已加载的内容 Pack；
-- `/bccyberware resourcepack [玩家]`：重新发送客户端资源包。
+- `/bccyberware resourcepack generate`：合并 Pack Assets 与 `Generation/merge` 并生成资源包；
+- `/bccyberware resourcepack [玩家]`：重新向玩家发送生成后的资源包。
 
 更多服主说明见 `src/main/resources/README-配置说明.md`。

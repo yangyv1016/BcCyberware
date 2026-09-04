@@ -33,13 +33,13 @@ jobs:
       - name: Install resource-pack tooling
         run: python -m pip install --disable-pip-version-check pillow
 
+      - name: Build resource pack
+        run: python tools/build_resource_pack.py
+
       - name: Test and build plugin
         run: |
           chmod +x ./gradlew
           ./gradlew clean test build --no-daemon --warning-mode all
-
-      - name: Build resource pack
-        run: python tools/build_resource_pack.py
 
       - name: Assemble release files
         shell: bash
@@ -50,6 +50,8 @@ jobs:
           cp "build/libs/BcCyberware-${VERSION}.jar" dist/
           cp "build/libs/BcCyberware-${VERSION}-sources.jar" dist/
           cp sample-pack/BcCyberware-Example-Pack.zip dist/
+          cp release/README.md dist/README-zh_CN.md
+          cp release/resources-example.yml dist/
           (
             cd dist
             sha256sum "BcCyberware-${VERSION}.jar" "BcCyberware-${VERSION}-sources.jar" > SHA256SUMS.txt

@@ -10,7 +10,7 @@ BcCyberware 是一个面向 Paper 1.21.11 的纯服务端义体框架。物品�
 plugins/BcCyberware/
 ├─ config.yml                  # GUI、SQLite、容量、全局阈值
 ├─ messages.yml                # 玩家提示语
-├─ resources.yml               # 客户端资源包发送顺序
+├─ resources.yml               # 资源包生成、托管与发送
 ├─ README-配置说明.md
 ├─ data/players.db             # SQLite 数据，不要手动编辑
 └─ packs/
@@ -45,8 +45,9 @@ Pack 是内容包，设计方式类似 MythicMobs 的可组合 Pack，但 BcCybe
 - `soft-depends`：存在时调整顺序，不存在也可继续。
 - `allow-overrides`：允许本 Pack 用同一个完整 ID 替换早先定义。默认关闭，
   防止拼写错误造成静默覆盖。
-- `resource-packs`：该内容 Pack 所需的资源包 ID；URL、SHA-1 和强制策略仍在
-  根目录 `resources.yml` 统一管理。
+- `Assets/`：该 Pack 自带的客户端资源，生成时按 Pack 顺序合并。
+- `resource-packs`：可选的旧版额外外部资源包 ID；仅在确实需要叠加外部包时使用，
+  常规义体材质直接放入本 Pack 的 `Assets/`。
 
 引用本 Pack 的定义可以写短 ID。跨 Pack 引用必须写完整 ID，例如
 `medical:native-lung`。每个定义最终都有唯一的 `namespace:id`。
@@ -188,11 +189,35 @@ triggers:
 `comparison` 支持 `GTE/GT/LTE/LT/EQ`。条件持续满足时，每到 `interval`
 执行一次 `actions`；所以可配置警告、药水效果、伤害、命令或特殊视听反应。
 
-## 8. 多资源包
+## 8. Pack Assets、生成与自动下发
 
-`resources.yml` 可按列表顺序向客户端发送多个 ZIP。每项包含稳定 `uuid`、直链 `url`、
-40 位十六进制 `sha1`、`required` 和 MiniMessage `prompt`。插件不内置 HTTP 服务器，
-需将示例 ZIP 上传到玩家可直接下载的地址。关闭 `enabled` 不影响义体功能。
+资源资产采用 MythicMobs + MythicCrucible 风格。每个启用的内容 Pack 都可以携带
+`Assets/` 目录，其内部就是标准资源包根目录结构：
+
+```text
+plugins/BcCyberware/packs/example/Assets/
+├─ pack.mcmeta
+├─ pack.png
+└─ assets/<namespace>/...
+```
+
+插件在后台按 Pack 的 `priority` 合并这些目录，再用 `Generation/merge/` 中的服主文件执行
+最终覆盖，输出为 `Generation/resource_pack.zip`。`SELFHOST` 会在配置端口托管该 ZIP；
+填写玩家可访问的 `public-url`、将 `deployment.enabled` 改为 `true` 并放行端口后，
+`auto-send.enabled=true` 会在玩家加入时自动下发，`send-on-update=true` 会在重新生成后
+立即推送给在线玩家。插件使用带 SHA-1 的不可变下载路径，旧缓存只保留最近 4 代。
+
+`EXTERNAL` 适合自行上传：先执行 generate，再上传 `Generation/resource_pack.zip`，把
+完整下载地址和已上传文件的 40 位 `sha1` 写入配置，最后 reload 才会切换和热推送。
+为避免上传时序错误，EXTERNAL 的 generate 只生成本地文件，不会擅自推送尚未上传的新包。
+
+内置 SELFHOST 面向本次单服与正常玩家流量：最多同时传输 64 个请求，额外请求等待
+最多 30 秒。大型资源包或高并发公网服建议在前方使用反向代理，或改用 EXTERNAL/CDN。
+仅当修改监听地址或端口时，旧监听会给在途下载最多 5 秒排空时间；同端口的日常内容
+热更新使用新的哈希地址，不受这项限制。
+
+默认核心材质会从插件 JAR 自动释放到 `packs/core/Assets/`，已存在的服主文件不会被
+覆盖。`external-packs` 保留用于叠加必须由其他系统托管的额外资源包，通常保持关闭。
 
 ## 9. 命令与权限
 
@@ -201,7 +226,8 @@ triggers:
 - `/bccyberware capacity get|set|add <玩家> [数值]`：查看或修改永久容量。
 - `/bccyberware inspect`：读取主手物品的 PDC 身份。
 - `/bccyberware pack`：列出已加载 Pack 和顺序。
-- `/bccyberware resourcepack [玩家]`：重新向在线玩家发送 `resources.yml` 中的资源包。
+- `/bccyberware resourcepack generate`：重新合并并生成；SELFHOST 可按配置热推，EXTERNAL 需上传后更新 SHA-1 再重载。
+- `/bccyberware resourcepack [玩家]`：重新向玩家发送当前生成包及额外外部包。
 - `/bccyberware reload`：校验后原子重载配置。
 
 普通玩家默认拥有 `bccyberware.use` 和 `bccyberware.install`。管理命令使用

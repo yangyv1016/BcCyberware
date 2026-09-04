@@ -207,6 +207,10 @@ public final class CyberwareCommand implements CommandExecutor, TabCompleter {
             text.send(sender, "no-permission");
             return true;
         }
+        if (resourcePacks.isBusy()) {
+            text.send(sender, "resource-pack-busy");
+            return true;
+        }
         if (!configs.reload()) {
             text.send(sender, "config-reload-failed");
             return true;
@@ -214,7 +218,15 @@ public final class CyberwareCommand implements CommandExecutor, TabCompleter {
         capacity.invalidateAll();
         menus.closeAllMenus();
         effects.reload();
-        text.send(sender, "config-reloaded");
+        boolean scheduled = resourcePacks.reloadDeploymentAsync(success -> text.send(
+                sender,
+                success ? "config-reloaded" : "config-reloaded-resource-pack-kept"
+        ));
+        if (!scheduled) {
+            text.send(sender, "config-reloaded-resource-pack-kept");
+            return true;
+        }
+        text.send(sender, "config-reload-resource-pack-started");
         return true;
     }
 
@@ -257,8 +269,20 @@ public final class CyberwareCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean sendResourcePack(CommandSender sender, String[] args) {
-        if (!sender.hasPermission("bccyberware.admin")) {
+        if (!sender.hasPermission("bccyberware.admin.resourcepack")) {
             text.send(sender, "no-permission");
+            return true;
+        }
+        if (args.length >= 2 && args[1].equalsIgnoreCase("generate")) {
+            boolean scheduled = resourcePacks.generateAsync(success -> text.send(
+                    sender,
+                    success ? "resource-pack-generated" : "resource-pack-generate-failed"
+            ));
+            if (scheduled) {
+                text.send(sender, "resource-pack-generation-started");
+            } else {
+                text.send(sender, "resource-pack-generate-failed");
+            }
             return true;
         }
         Player target = args.length >= 2 ? Bukkit.getPlayerExact(args[1]) : sender instanceof Player player ? player : null;
@@ -308,6 +332,9 @@ public final class CyberwareCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             candidates.addAll(List.of("open", "give", "capacity", "reload", "inspect", "pack", "resourcepack"));
         } else if (args.length == 2 && SetLike.contains(args[0], "give", "resourcepack")) {
+            if (args[0].equalsIgnoreCase("resourcepack")) {
+                candidates.add("generate");
+            }
             Bukkit.getOnlinePlayers().forEach(player -> candidates.add(player.getName()));
         } else if (args.length == 2 && args[0].equalsIgnoreCase("capacity")) {
             candidates.addAll(List.of("get", "set", "add"));

@@ -10,6 +10,5 @@ run/
 release/*.jar
 release/*.zip
 
-# 可由 tools/build_resource_pack.py 重建的压缩包，以及图像生成阶段的高清原稿。
-sample-pack/BcCyberware-Example-Pack.zip
+# 图像生成阶段的高清原稿不进入 Git；可部署的 64x64 成品与 ZIP 纳入版本控制。
 sample-pack/source-art/

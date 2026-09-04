@@ -25,6 +25,7 @@ public final class BcCyberwarePlugin extends JavaPlugin {
     private ConfigManager configs;
     private ProfileService profiles;
     private EffectEngine effects;
+    private ResourcePackService resourcePacks;
     private BcCyberwareApi api;
 
     @Override
@@ -54,7 +55,10 @@ public final class BcCyberwarePlugin extends JavaPlugin {
         CapacityService capacity = new CapacityService(this, configs, items);
         effects = new EffectEngine(this, configs, profiles, capacity, items, text);
         MenuService menus = new MenuService(configs, profiles, items, capacity, effects, text);
-        ResourcePackService resourcePacks = new ResourcePackService(this, configs, text);
+        resourcePacks = new ResourcePackService(this, configs, text);
+        if (!resourcePacks.start()) {
+            getLogger().warning("义体功能继续运行，但资源包生成或部署当前不可用。请检查 resources.yml 和端口占用。 ");
+        }
         CyberwareEventListener events = new CyberwareEventListener(this, profiles, capacity, effects);
 
         Bukkit.getPluginManager().registerEvents(events, this);
@@ -86,6 +90,9 @@ public final class BcCyberwarePlugin extends JavaPlugin {
         Bukkit.getServicesManager().unregisterAll(this);
         if (effects != null) {
             effects.stop();
+        }
+        if (resourcePacks != null) {
+            resourcePacks.close();
         }
         if (profiles != null) {
             profiles.shutdown();

@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "cn.bilicraft"
-version = "0.0.1"
+version = "0.0.2"
 val pluginVersion = version.toString()
 
 repositories {
@@ -39,6 +39,10 @@ tasks.withType<JavaCompile>().configureEach {
 tasks.processResources {
     filteringCharset = "UTF-8"
     inputs.property("pluginVersion", pluginVersion)
+    inputs.file("sample-pack/BcCyberware-Example-Pack.zip")
+    from("sample-pack/BcCyberware-Example-Pack.zip") {
+        into("bundled-resourcepacks")
+    }
     filesMatching("plugin.yml") {
         expand("version" to pluginVersion)
     }

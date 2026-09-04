@@ -2,6 +2,17 @@
 
 本项目遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## v0.0.2 - 2026-09-04
+
+- 采用 MythicMobs + MythicCrucible 风格的资源资产工作流；
+- 每个内容 Pack 可携带独立 `Assets/`，并按 Pack 优先级合并；
+- 支持 `Generation/merge/` 最终覆盖层和 `Generation/resource_pack.zip` 自动生成；
+- 新增 `SELFHOST` 内置托管、玩家加入自动下发和生成后在线热推送；
+- 支持显式 SHA-1 的 `EXTERNAL` 部署；生成与上传分离，避免向玩家提前推送未上传文件；
+- SELFHOST 使用哈希不可变下载地址并只保留最近 4 代缓存；
+- 默认核心 Pack 材质随插件释放，无需服主另外下载默认资源包；
+- 新增 `/bccyberware resourcepack generate` 管理命令。
+
 ## v0.0.1 - 2026-09-04
 
 首个可用版本：

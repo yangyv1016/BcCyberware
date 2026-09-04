@@ -9,7 +9,10 @@
 - 高分辨率透明原图：`source-art/`
 - 可重复构建脚本：`../tools/build_resource_pack.py`
 
-将 ZIP 上传到玩家可直接下载的 HTTP/HTTPS 地址，然后把 URL 和 SHA-1 填入
-`plugins/BcCyberware/resources.yml`。插件本身不提供 HTTP 托管。
+插件会在首次启动时把默认资源释放到
+`plugins/BcCyberware/packs/core/Assets/`，然后生成
+`plugins/BcCyberware/Generation/resource_pack.zip`。启用部署后默认使用 `SELFHOST`
+模式，由插件自己托管成品，并在玩家加入时自动下发；服主需要在 `resources.yml`
+填写玩家可访问的服务器公网地址、将 `deployment.enabled` 改为 `true`，并放行资源包端口。
 
 这些图标为本项目生成的原创资产，没有使用《赛博朋克 2077》的名称、描述、图标或模型。
