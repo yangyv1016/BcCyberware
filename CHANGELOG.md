@@ -2,6 +2,15 @@
 
 本项目遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## v0.0.7 - 2026-09-05
+
+- 修复 AsPaper 等具有更严格插件类路径隔离的服务端上，直接引用
+  `io.th0rgal.oraxen.api.OraxenPack` 导致的 `NoClassDefFoundError`；
+- 改由服务器中已启用的 Oraxen 实例取得其类加载器，再解析并调用同一套公开 API；
+- 动态注册 `OraxenPackGeneratedEvent` 与 `OraxenPackUploadEvent`，避免事件签名产生静态类链接；
+- API 类或方法不兼容时输出一次明确版本诊断并停止重试，不再让 Bukkit 定时任务反复抛错；
+- 新增真实 Oraxen API 解析、同路径资源替换和缺类降级测试。
+
 ## v0.0.6 - 2026-09-05
 
 - 删除错误引入的 ResourcePackManager、SELFHOST 与 EXTERNAL 部署链路；

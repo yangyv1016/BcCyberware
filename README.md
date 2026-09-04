@@ -24,7 +24,7 @@
 .\gradlew.bat clean test build
 ```
 
-产物位于 `build/libs/BcCyberware-0.0.6.jar`。首次启动后，默认配置和核心 Pack 的 Assets 会释放到 `plugins/BcCyberware/`；插件不会在读取或重载时回写 YAML，因此服主注释不会被清除。
+产物位于 `build/libs/BcCyberware-0.0.7.jar`。首次启动后，默认配置和核心 Pack 的 Assets 会释放到 `plugins/BcCyberware/`；插件不会在读取或重载时回写 YAML，因此服主注释不会被清除。
 
 ## 资源包部署
 
@@ -34,6 +34,9 @@ Oraxen 是运行时硬依赖。义体资源放在
 `OraxenPack.reloadPack()` 触发最终构建。BcCyberware 不监听 HTTP 端口、不配置下载直链、
 也不调用 Paper API 另发一份包；最终 ZIP、上传、SHA-1、提示语、强制加载和玩家进服发送
 均使用 `plugins/Oraxen/settings.yml` 中 Oraxen 自己的配置。
+
+为兼容 AsPaper 等严格隔离插件类路径的服务端，BcCyberware 会从已启用的 Oraxen 实例取得
+Oraxen 自己的类加载器，再调用上述公开 API；不会把 Oraxen 类复制或打包进本插件 JAR。
 
 默认器官材质也走同一注入链路。生成后的
 `plugins/BcCyberware/Generation/resource_pack.zip` 只是 BcCyberware 的中间产物，

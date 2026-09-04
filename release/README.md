@@ -1,7 +1,7 @@
-# BcCyberware v0.0.6 交付包
+# BcCyberware v0.0.7 交付包
 
 1. 确认服务端为 Paper 1.21.11，使用 Java 21。
-2. 先安装与你的 Paper 版本兼容的 Oraxen，再将 `BcCyberware-0.0.6.jar` 放入服务端
+2. 先安装与你的 Paper 版本兼容的 Oraxen，再将 `BcCyberware-0.0.7.jar` 放入服务端
    `plugins/`。BcCyberware 将 Oraxen 声明为硬依赖，没有 Oraxen 时不会启动。
 3. 首次启动后编辑 `plugins/BcCyberware/` 中的带注释配置。
 4. 默认材质会自动释放到 `packs/core/Assets/`，并生成到
@@ -19,6 +19,9 @@
 
 BcCyberware 不再提供 SELFHOST、EXTERNAL 或 ResourcePackManager 模式，也不会单独向
 玩家发送第二份资源包。手动重发请使用 Oraxen 自己的资源包重发功能。
+
+v0.0.7 起会通过已加载的 Oraxen 实例解析其公开 API，兼容 AsPaper 等严格隔离插件
+类路径的服务端；不要把 `sources.jar` 放入 `plugins/`。
 
 完整配置手册会在首次启动时释放为
 `plugins/BcCyberware/README-配置说明.md`。

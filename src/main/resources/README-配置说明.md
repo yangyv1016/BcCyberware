@@ -207,7 +207,9 @@ plugins/BcCyberware/packs/example/Assets/
 插件在后台按 Pack 的 `priority` 合并这些目录，再用 `Generation/merge/` 中的服主文件执行
 最终覆盖，输出为 `Generation/resource_pack.zip`。
 
-BcCyberware 直接依赖 Oraxen，并使用 Oraxen 官方公开的资源包生成事件。`resources.yml`
+BcCyberware 将 Oraxen 声明为硬依赖，并使用 Oraxen 官方公开的资源包生成事件。为兼容
+AsPaper 等严格隔离插件类路径的服务端，运行时会从已启用的 Oraxen 实例取得它自己的
+类加载器，再解析公开 API；Oraxen 类不会被复制到 BcCyberware JAR。`resources.yml`
 默认配置如下：
 
 ```yaml

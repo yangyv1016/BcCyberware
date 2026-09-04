@@ -60,7 +60,6 @@ public final class BcCyberwarePlugin extends JavaPlugin {
 
         Bukkit.getPluginManager().registerEvents(events, this);
         Bukkit.getPluginManager().registerEvents(menus, this);
-        Bukkit.getPluginManager().registerEvents(resourcePacks, this);
         if (!resourcePacks.start()) {
             getLogger().warning("义体功能继续运行，但资源包生成或 Oraxen 注入当前不可用。请检查 resources.yml。 ");
         }

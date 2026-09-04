@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "cn.bilicraft"
-version = "0.0.6"
+version = "0.0.7"
 val pluginVersion = version.toString()
 
 repositories {
@@ -27,6 +27,9 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.13.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    testRuntimeOnly("io.th0rgal:oraxen:1.218.0") {
+        isTransitive = false
+    }
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

@@ -4,18 +4,10 @@ import cn.bilicraft.bccyberware.config.ConfigManager;
 import cn.bilicraft.bccyberware.config.model.ConfigSnapshot;
 import cn.bilicraft.bccyberware.config.model.ResourcePackDeploymentSettings;
 import cn.bilicraft.bccyberware.text.TextService;
-import io.th0rgal.oraxen.api.OraxenPack;
-import io.th0rgal.oraxen.api.events.OraxenPackGeneratedEvent;
-import io.th0rgal.oraxen.api.events.OraxenPackUploadEvent;
-import io.th0rgal.oraxen.utils.VirtualFile;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -28,7 +20,7 @@ import java.util.logging.Level;
  * Generates BcCyberware assets and injects them into Oraxen's single final pack.
  * Oraxen remains the only component that zips, uploads and dispatches that pack.
  */
-public final class ResourcePackService implements Listener {
+public final class ResourcePackService {
     private static final long ORAXEN_RETRY_DELAY_TICKS = 40L;
     private static final int MAX_ORAXEN_RELOAD_ATTEMPTS = 15;
 
@@ -36,6 +28,7 @@ public final class ResourcePackService implements Listener {
     private final ConfigManager configs;
     private final TextService text;
     private final ResourcePackGenerator generator;
+    private final OraxenApiBridge oraxen;
     private final AtomicBoolean taskRunning = new AtomicBoolean();
     private final AtomicBoolean retryScheduled = new AtomicBoolean();
     private final AtomicLong operationEpoch = new AtomicLong();
@@ -50,6 +43,17 @@ public final class ResourcePackService implements Listener {
         this.configs = configs;
         this.text = text;
         this.generator = new ResourcePackGenerator(plugin.getDataFolder().toPath());
+        OraxenApiBridge connected = null;
+        try {
+            connected = OraxenApiBridge.connect(plugin, this::onOraxenPackGenerated, this::onOraxenPackUploaded);
+            plugin.getLogger().info("已连接 Oraxen " + connected.version()
+                    + " 公共资源包 API（兼容隔离类加载器）。");
+        } catch (OraxenApiBridge.IntegrationException | LinkageError | RuntimeException exception) {
+            plugin.getLogger().log(Level.SEVERE,
+                    "无法连接 Oraxen 公共资源包 API；义体功能可以继续运行，但资源不会注入："
+                            + exception.getMessage(), exception);
+        }
+        this.oraxen = connected;
     }
 
     public boolean start() {
@@ -162,8 +166,22 @@ public final class ResourcePackService implements Listener {
         if (closed || !reloadPending) {
             return;
         }
+        if (oraxen == null) {
+            reloadPending = false;
+            plugin.getLogger().severe("Oraxen 公共 API 不可用，无法重建并注入义体资源。"
+                    + "请检查启动阶段更早的 Oraxen API 诊断。");
+            return;
+        }
         reloadAttempts++;
-        OraxenPack.reloadPack();
+        try {
+            oraxen.reloadPack();
+        } catch (OraxenApiBridge.IntegrationException | LinkageError exception) {
+            reloadPending = false;
+            plugin.getLogger().log(Level.SEVERE,
+                    "调用 OraxenPack.reloadPack() 失败；已停止重试，避免定时任务反复报错："
+                            + exception.getMessage(), exception);
+            return;
+        }
         if (reloadPending && reloadAttempts < MAX_ORAXEN_RELOAD_ATTEMPTS) {
             scheduleOraxenReloadRetry();
         } else if (reloadPending) {
@@ -181,8 +199,7 @@ public final class ResourcePackService implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGH)
-    public void onOraxenPackGenerated(OraxenPackGeneratedEvent event) {
+    private void onOraxenPackGenerated(Object event) {
         if (closed) {
             return;
         }
@@ -196,20 +213,23 @@ public final class ResourcePackService implements Listener {
             return;
         }
 
-        event.getOutput().removeIf(file -> assets.containsKey(file.getPath()));
-        assets.forEach((path, bytes) -> {
-            int separator = path.lastIndexOf('/');
-            String parent = separator < 0 ? "" : path.substring(0, separator);
-            String name = separator < 0 ? path : path.substring(separator + 1);
-            event.getOutput().add(new VirtualFile(parent, name, new ByteArrayInputStream(bytes)));
-        });
+        if (oraxen == null) {
+            return;
+        }
+        try {
+            oraxen.injectAssets(event, assets);
+        } catch (OraxenApiBridge.IntegrationException | LinkageError exception) {
+            reloadPending = false;
+            plugin.getLogger().log(Level.SEVERE,
+                    "向 OraxenPackGeneratedEvent 注入资源失败：" + exception.getMessage(), exception);
+            return;
+        }
         reloadPending = false;
         plugin.getLogger().info("已通过 OraxenPackGeneratedEvent 注入 " + assets.size()
                 + " 个 BcCyberware 资源；最终 ZIP、上传和玩家下发由 Oraxen 统一完成。");
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onOraxenPackUploaded(OraxenPackUploadEvent event) {
+    private void onOraxenPackUploaded() {
         if (reloadPending) {
             Bukkit.getScheduler().runTask(plugin, this::tryOraxenReload);
         }
