@@ -1,0 +1,37 @@
+name: BcCyberware
+version: '${version}'
+main: cn.bilicraft.bccyberware.BcCyberwarePlugin
+description: 可配置的 Paper 义体、原生器官、容量与身体状态系统
+api-version: '1.21.11'
+authors: [BiliCraft]
+softdepend: [PlaceholderAPI, mcMMO, Citizens]
+
+commands:
+  bccyberware:
+    description: 打开或管理 BcCyberware 义体系统
+    usage: /bccyberware [open|give|capacity|reload|inspect|pack|resourcepack]
+    aliases: [cyberware, cyber]
+
+permissions:
+  bccyberware.use:
+    description: 允许打开自己的义体 GUI
+    default: true
+  bccyberware.install:
+    description: 允许安装、替换和拆卸义体
+    default: true
+  bccyberware.admin:
+    description: 允许使用全部管理命令
+    default: op
+    children:
+      bccyberware.admin.give: true
+      bccyberware.admin.capacity: true
+      bccyberware.admin.reload: true
+      bccyberware.admin.inspect: true
+  bccyberware.admin.give:
+    default: op
+  bccyberware.admin.capacity:
+    default: op
+  bccyberware.admin.reload:
+    default: op
+  bccyberware.admin.inspect:
+    default: op

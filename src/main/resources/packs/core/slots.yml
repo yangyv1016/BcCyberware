@@ -1,0 +1,171 @@
+# ============================================================================
+# Core Pack：身体槽位与 GUI 位置
+# ============================================================================
+# 每个顶层键都是唯一槽位 ID，只允许小写字母、数字、下划线和短横线。
+#
+# gui-slot：箱子 GUI 中从 0 开始的格子编号。6 行箱子范围为 0～53。
+# 未填写时，插件会按本文件中的顺序寻找第一个未占用格子作为默认位置。
+# type：该位置唯一接受的部件类型；每种义体定义只能填写一个 type。
+# default-organ：玩家首次建档时默认安装的原生器官 ID；留空表示初始为空。
+#
+# empty-effects：该位置为空时生效的规则。当前推荐 trigger 使用 PERIODIC，
+# interval 为触发间隔。动作格式详见 README-配置说明.md。
+
+brain-core:
+  type: BRAIN
+  display-name: "<aqua>脑部核心"
+  gui-slot: 4
+  default-organ: native-brain
+  empty-effects:
+    - trigger: PERIODIC
+      interval: 3s
+      actions:
+        - type: DAMAGE
+          amount: 8.0
+        - type: POTION
+          effect: NAUSEA
+          duration: 4s
+          amplifier: 1
+        - type: ACTION_BAR
+          text: "<red>缺少脑部核心：生命活动正在崩溃"
+
+eyes:
+  type: EYES
+  display-name: "<aqua>视觉系统"
+  gui-slot: 13
+  default-organ: native-eyes
+  empty-effects:
+    - trigger: PERIODIC
+      interval: 4s
+      actions:
+        - type: POTION
+          effect: BLINDNESS
+          duration: 6s
+          amplifier: 0
+
+circulatory:
+  type: CIRCULATORY
+  display-name: "<red>循环系统"
+  gui-slot: 22
+  default-organ: native-heart
+  empty-effects:
+    - trigger: PERIODIC
+      interval: 2s
+      actions:
+        - type: DAMAGE
+          amount: 6.0
+        - type: PARTICLE
+          particle: DAMAGE_INDICATOR
+          count: 8
+
+nervous:
+  type: NERVOUS
+  display-name: "<yellow>神经系统"
+  gui-slot: 30
+  default-organ: native-nerves
+  empty-effects:
+    - trigger: PERIODIC
+      interval: 5s
+      actions:
+        - type: POTION
+          effect: SLOWNESS
+          duration: 7s
+          amplifier: 2
+        - type: POTION
+          effect: WEAKNESS
+          duration: 7s
+          amplifier: 1
+
+skeleton:
+  type: SKELETON
+  display-name: "<white>骨骼"
+  gui-slot: 31
+  default-organ: native-skeleton
+  empty-effects:
+    - trigger: PERIODIC
+      interval: 5s
+      actions:
+        - type: POTION
+          effect: SLOWNESS
+          duration: 7s
+          amplifier: 3
+        - type: DAMAGE
+          amount: 2.0
+
+skin:
+  type: SKIN
+  display-name: "<gold>表皮系统"
+  gui-slot: 32
+  default-organ: native-skin
+  empty-effects:
+    - trigger: PERIODIC
+      interval: 8s
+      actions:
+        - type: DAMAGE
+          amount: 1.0
+        - type: ACTION_BAR
+          text: "<yellow>表皮缺失：身体正暴露于环境中"
+
+left-arm:
+  type: LEFT_ARM
+  display-name: "<green>左臂"
+  gui-slot: 38
+  default-organ: native-left-arm
+  empty-effects:
+    - trigger: PERIODIC
+      interval: 5s
+      actions:
+        - type: POTION
+          effect: MINING_FATIGUE
+          duration: 7s
+          amplifier: 1
+
+right-arm:
+  type: RIGHT_ARM
+  display-name: "<green>右臂"
+  gui-slot: 42
+  default-organ: native-right-arm
+  empty-effects:
+    - trigger: PERIODIC
+      interval: 5s
+      actions:
+        - type: POTION
+          effect: WEAKNESS
+          duration: 7s
+          amplifier: 1
+
+left-leg:
+  type: LEFT_LEG
+  display-name: "<blue>左腿"
+  gui-slot: 47
+  default-organ: native-left-leg
+  empty-effects:
+    - trigger: PERIODIC
+      interval: 4s
+      actions:
+        - type: POTION
+          effect: SLOWNESS
+          duration: 6s
+          amplifier: 4
+        - type: POTION
+          effect: JUMP_BOOST
+          duration: 6s
+          amplifier: 128
+
+right-leg:
+  type: RIGHT_LEG
+  display-name: "<blue>右腿"
+  gui-slot: 51
+  default-organ: native-right-leg
+  empty-effects:
+    - trigger: PERIODIC
+      interval: 4s
+      actions:
+        - type: POTION
+          effect: SLOWNESS
+          duration: 6s
+          amplifier: 4
+        - type: POTION
+          effect: JUMP_BOOST
+          duration: 6s
+          amplifier: 128

@@ -1,0 +1,26 @@
+# ============================================================================
+# Pack 清单
+# ============================================================================
+# id：Pack 的稳定标识，只允许小写字母、数字、下划线和短横线。
+# namespace：本 Pack 中未写命名空间的槽位与部件 ID 会自动添加此前缀。
+# enabled：false 时整个 Pack 不参与加载。
+# priority：数字越小越先加载。依赖关系始终优先于 priority。
+# depends：硬依赖；缺少或停用其中任意 Pack 时，本 Pack 加载失败。
+# soft-depends：软依赖；存在时调整加载顺序，不存在也允许继续加载。
+# allow-overrides：是否允许本 Pack 显式替换已存在的完整 ID。默认 false，避免静默覆盖。
+
+id: core
+namespace: core
+display-name: "BcCyberware 原生核心包"
+version: "1.0.0"
+description: "默认身体槽位（四肢分左右）、原生器官和八件原创示例义体。"
+enabled: true
+priority: 0
+depends: []
+soft-depends: []
+allow-overrides: false
+
+# 可选：本 Pack 需要玩家同时加载的 resources.yml 资源包 ID。
+# 对应资源包仍在插件根目录 resources.yml 中声明 URL、SHA-1 和强制策略。
+resource-packs:
+  - bccyberware-default

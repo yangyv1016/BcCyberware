@@ -1,0 +1,21 @@
+# ============================================================================
+# 客户端资源包
+# ============================================================================
+# enabled=false 时插件不会主动发送任何资源包，但义体功能仍可使用。
+# URL 必须是客户端能够直接下载的 HTTPS/HTTP ZIP 地址，不能是网页预览地址。
+# sha1 必须是 ZIP 文件的 40 位十六进制 SHA-1；留空时客户端缓存更新不可靠。
+# uuid 用来区分多个叠加资源包。修改同一资源包内容时通常保留 UUID 并更新 SHA-1。
+# prompt 支持 MiniMessage。required=true 时，玩家拒绝资源包将被客户端断开。
+
+enabled: false
+
+# 把 sample-pack/BcCyberware-Example-Pack.zip 上传后，将 packs: [] 替换为下面的示例。
+# packs:
+  # - id: bccyberware-default
+  #   uuid: "b5c9a5c4-a607-4b35-92a3-81d0b40915a2"
+  #   url: "https://example.com/BcCyberware-Example-Pack.zip"
+  #   # 下方是随本项目附带 ZIP 的可复现 SHA-1；如果你修改材质，请改为新哈希。
+  #   sha1: "717788d55f2d2f152b96c3d4f550810b1ef8cf37"
+  #   required: true
+  #   prompt: "<aqua>BcCyberware 需要加载义体外观资源包。"
+packs: []

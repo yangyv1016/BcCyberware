@@ -1,0 +1,91 @@
+# ============================================================================
+# Core Pack 示例：事件与条件触发义体
+# ============================================================================
+# type 合法值见 README-配置说明.md。chance 范围 0～1；0.25 表示 25%。
+# cooldown 是同一玩家、同一义体、同一条触发器再次执行前的冷却。
+
+items:
+  nociception-gate:
+    slot-type: NERVOUS
+    material: PAPER
+    item-model: "bccyberware:nociception_gate"
+    custom-model-data: 1201
+    capacity-cost: 13
+    display-name: "<yellow>痛觉闸门"
+    lore:
+      - "<gray>受创时短暂压低疼痛与应激信号。"
+      - "<dark_gray>25% 概率获得短暂抗性，冷却 8 秒。"
+      - "<dark_gray>容量：<aqua><capacity>"
+    triggers:
+      - type: DAMAGED
+        chance: 0.25
+        cooldown: 8s
+        actions:
+          - type: POTION
+            target: SELF
+            effect: RESISTANCE
+            duration: 3s
+            amplifier: 0
+          - type: SOUND
+            sound: BLOCK_RESPAWN_ANCHOR_CHARGE
+            volume: 0.55
+            pitch: 1.65
+
+  predictive-optics:
+    slot-type: EYES
+    material: PAPER
+    item-model: "bccyberware:predictive_optics"
+    custom-model-data: 1202
+    capacity-cost: 9
+    display-name: "<aqua>先见光学阵列"
+    lore:
+      - "<gray>根据动作轨迹提前标记攻击目标。"
+      - "<dark_gray>攻击时概率使目标显形。"
+      - "<dark_gray>容量：<aqua><capacity>"
+    triggers:
+      - type: ATTACK
+        chance: 0.20
+        cooldown: 4s
+        actions:
+          - type: POTION
+            target: TARGET
+            effect: GLOWING
+            duration: 5s
+            amplifier: 0
+          - type: PARTICLE
+            target: TARGET
+            particle: ELECTRIC_SPARK
+            count: 10
+
+  adrenal-reservoir:
+    slot-type: CIRCULATORY
+    material: PAPER
+    item-model: "bccyberware:adrenal_reservoir"
+    custom-model-data: 1203
+    capacity-cost: 15
+    display-name: "<red>肾上腺储能囊"
+    lore:
+      - "<gray>生命危急时释放浓缩代谢促进剂。"
+      - "<dark_gray>生命低于 35% 时周期检测，触发后冷却 25 秒。"
+      - "<dark_gray>容量：<aqua><capacity>"
+    triggers:
+      - type: PERIODIC
+        interval: 1s
+        cooldown: 25s
+        conditions:
+          - type: HEALTH_PERCENT
+            comparison: LTE
+            value: 35
+        actions:
+          - type: POTION
+            effect: SPEED
+            duration: 6s
+            amplifier: 1
+          - type: POTION
+            effect: STRENGTH
+            duration: 6s
+            amplifier: 0
+          - type: SOUND
+            sound: ENTITY_WARDEN_HEARTBEAT
+            volume: 0.7
+            pitch: 1.4

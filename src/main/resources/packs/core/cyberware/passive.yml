@@ -1,0 +1,67 @@
+# ============================================================================
+# Core Pack 示例：被动义体
+# ============================================================================
+# 本文件的示例使用 PASSIVE 触发器。ATTRIBUTE 动作会在安装、登录和配置重载时
+# 统一重算；拆卸后对应属性修饰自动移除，不会永久污染玩家基础属性。
+
+items:
+  pulseforge-heart:
+    slot-type: CIRCULATORY
+    material: PAPER
+    item-model: "bccyberware:pulseforge_heart"
+    custom-model-data: 1101
+    capacity-cost: 14
+    display-name: "<red>脉铸循环核心"
+    lore:
+      - "<gray>多腔磁驱泵体，提升血液输送余量。"
+      - "<dark_gray>效果：最大生命值 +4"
+      - "<dark_gray>容量：<aqua><capacity>"
+    triggers:
+      - type: PASSIVE
+        actions:
+          - type: ATTRIBUTE
+            attribute: MAX_HEALTH
+            operation: ADD_NUMBER
+            amount: 4.0
+
+  carbon-lattice:
+    slot-type: SKELETON
+    material: PAPER
+    item-model: "bccyberware:carbon_lattice"
+    custom-model-data: 1102
+    capacity-cost: 12
+    display-name: "<white>碳晶骨架网"
+    lore:
+      - "<gray>在骨小梁间构筑轻量复合支撑层。"
+      - "<dark_gray>效果：护甲 +4，击退抗性 +10%"
+      - "<dark_gray>容量：<aqua><capacity>"
+    triggers:
+      - type: PASSIVE
+        actions:
+          - type: ATTRIBUTE
+            attribute: ARMOR
+            operation: ADD_NUMBER
+            amount: 4.0
+          - type: ATTRIBUTE
+            attribute: KNOCKBACK_RESISTANCE
+            operation: ADD_NUMBER
+            amount: 0.1
+
+  prism-dermis:
+    slot-type: SKIN
+    material: PAPER
+    item-model: "bccyberware:prism_dermis"
+    custom-model-data: 1103
+    capacity-cost: 10
+    display-name: "<gold>棱膜表皮"
+    lore:
+      - "<gray>在皮下展开微型防护鳞片。"
+      - "<dark_gray>效果：护甲 +3"
+      - "<dark_gray>容量：<aqua><capacity>"
+    triggers:
+      - type: PASSIVE
+        actions:
+          - type: ATTRIBUTE
+            attribute: ARMOR
+            operation: ADD_NUMBER
+            amount: 3.0

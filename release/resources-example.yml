@@ -1,0 +1,9 @@
+# 将 url 改成 BcCyberware-Example-Pack.zip 的真实直链。
+enabled: true
+packs:
+  - id: bccyberware-default
+    uuid: "b5c9a5c4-a607-4b35-92a3-81d0b40915a2"
+    url: "https://example.com/BcCyberware-Example-Pack.zip"
+    sha1: "717788d55f2d2f152b96c3d4f550810b1ef8cf37"
+    required: true
+    prompt: "<aqua>BcCyberware 需要加载义体外观资源包。"

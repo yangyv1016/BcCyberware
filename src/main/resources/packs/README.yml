@@ -1,0 +1,20 @@
+# ============================================================================
+# BcCyberware Pack 目录说明
+# ============================================================================
+# 这是说明文件，不会被当作一个 Pack 加载。
+#
+# 创建新 Pack：
+# 1. 复制 packs/core 整个目录，例如复制为 packs/military。
+# 2. 修改 military/pack.yml 中的 id、namespace、display-name 和 version。
+# 3. 删除不需要的槽位/器官/义体定义，再添加自己的 YAML。
+# 4. 执行 /bccyberware reload；后台会显示 Pack 的加载顺序与数量。
+#
+# 目录约定：
+# packs/<pack-id>/pack.yml              必需，Pack 清单
+# packs/<pack-id>/slots.yml             可选，身体槽位
+# packs/<pack-id>/organs/*.yml          可选，原生器官
+# packs/<pack-id>/cyberware/*.yml       可选，普通义体
+# packs/<pack-id>/thresholds/*.yml      可选，额外周期阈值
+#
+# 引用其他 Pack 的内容时写完整 ID，例如 core:native-heart。
+# 同一 Pack 内可以只写 native-heart，加载时会自动补成当前 namespace。

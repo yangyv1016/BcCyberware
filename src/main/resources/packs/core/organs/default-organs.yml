@@ -1,0 +1,147 @@
+# ============================================================================
+# Core Pack：默认原生器官
+# ============================================================================
+# 玩家首次建档时，slots.yml 的 default-organ 会引用本文件中的 ID。
+# 原生器官是普通、真实、可交易和可移植的部件，只是额外记录最初主人姓名与 UUID。
+#
+# 字段：
+# slot-type         只能安装到 slots.yml 中 type 相同的位置。
+# material          原版载体材质；留空时默认为 PAPER。
+# item-model        1.21.11 资源包 item_model 键；留空则不设置。
+# custom-model-data 兼容服主已有模型分配；留空或 0 时不设置。
+# capacity-cost     安装后占用的义体容量，原生器官通常为 0。
+# display-name      支持 MiniMessage；<owner> 会替换为器官最初主人。
+# lore              支持 <owner>、<owner_uuid>、<capacity>、<slot>。
+# triggers          与普通义体相同；空列表表示没有额外能力。
+
+items:
+  native-brain:
+    slot-type: BRAIN
+    material: PAPER
+    item-model: "bccyberware:native_brain"
+    custom-model-data: 1001
+    capacity-cost: 0
+    original-organ: true
+    display-name: "<white><owner> 的原生脑组织"
+    lore:
+      - "<gray>未经人工改造的神经中枢。"
+      - "<dark_gray>原始主人：<white><owner>"
+      - "<dark_gray>器官来源会永久保留，但允许移植。"
+    triggers: []
+
+  native-eyes:
+    slot-type: EYES
+    material: PAPER
+    item-model: "bccyberware:native_eyes"
+    custom-model-data: 1002
+    capacity-cost: 0
+    original-organ: true
+    display-name: "<white><owner> 的原生视觉器官"
+    lore:
+      - "<gray>仍保留自然虹膜与视觉神经。"
+      - "<dark_gray>原始主人：<white><owner>"
+    triggers: []
+
+  native-heart:
+    slot-type: CIRCULATORY
+    material: PAPER
+    item-model: "bccyberware:native_heart"
+    custom-model-data: 1003
+    capacity-cost: 0
+    original-organ: true
+    display-name: "<white><owner> 的原生心脏"
+    lore:
+      - "<gray>以自然节律维持全身血液循环。"
+      - "<dark_gray>原始主人：<white><owner>"
+    triggers: []
+
+  native-nerves:
+    slot-type: NERVOUS
+    material: PAPER
+    item-model: "bccyberware:native_nerves"
+    custom-model-data: 1004
+    capacity-cost: 0
+    original-organ: true
+    display-name: "<white><owner> 的原生神经束"
+    lore:
+      - "<gray>传递感觉、运动与自主神经信号。"
+      - "<dark_gray>原始主人：<white><owner>"
+    triggers: []
+
+  native-skeleton:
+    slot-type: SKELETON
+    material: PAPER
+    item-model: "bccyberware:native_skeleton"
+    custom-model-data: 1005
+    capacity-cost: 0
+    original-organ: true
+    display-name: "<white><owner> 的原生骨骼"
+    lore:
+      - "<gray>未经复合材料强化的自然骨骼。"
+      - "<dark_gray>原始主人：<white><owner>"
+    triggers: []
+
+  native-skin:
+    slot-type: SKIN
+    material: PAPER
+    item-model: "bccyberware:native_skin"
+    custom-model-data: 1006
+    capacity-cost: 0
+    original-organ: true
+    display-name: "<white><owner> 的原生表皮"
+    lore:
+      - "<gray>承担感知、防护与体温调节。"
+      - "<dark_gray>原始主人：<white><owner>"
+    triggers: []
+
+  native-left-arm:
+    slot-type: LEFT_ARM
+    material: PAPER
+    item-model: "bccyberware:native_left_arm"
+    custom-model-data: 1007
+    capacity-cost: 0
+    original-organ: true
+    display-name: "<white><owner> 的原生左臂"
+    lore:
+      - "<gray>完整保留自然肌肉与触觉反馈。"
+      - "<dark_gray>原始主人：<white><owner>"
+    triggers: []
+
+  native-right-arm:
+    slot-type: RIGHT_ARM
+    material: PAPER
+    item-model: "bccyberware:native_right_arm"
+    custom-model-data: 1008
+    capacity-cost: 0
+    original-organ: true
+    display-name: "<white><owner> 的原生右臂"
+    lore:
+      - "<gray>完整保留自然肌肉与触觉反馈。"
+      - "<dark_gray>原始主人：<white><owner>"
+    triggers: []
+
+  native-left-leg:
+    slot-type: LEFT_LEG
+    material: PAPER
+    item-model: "bccyberware:native_left_leg"
+    custom-model-data: 1009
+    capacity-cost: 0
+    original-organ: true
+    display-name: "<white><owner> 的原生左腿"
+    lore:
+      - "<gray>自然肌肉、骨骼和末梢神经共同构成。"
+      - "<dark_gray>原始主人：<white><owner>"
+    triggers: []
+
+  native-right-leg:
+    slot-type: RIGHT_LEG
+    material: PAPER
+    item-model: "bccyberware:native_right_leg"
+    custom-model-data: 1010
+    capacity-cost: 0
+    original-organ: true
+    display-name: "<white><owner> 的原生右腿"
+    lore:
+      - "<gray>自然肌肉、骨骼和末梢神经共同构成。"
+      - "<dark_gray>原始主人：<white><owner>"
+    triggers: []

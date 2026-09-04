@@ -1,0 +1,15 @@
+.gradle/
+.idea/
+.tooling/
+build/
+out/
+*.iml
+run/
+
+# 发布成品由 GitHub Release 托管，本地 release/ 中的说明与示例配置仍纳入版本控制。
+release/*.jar
+release/*.zip
+
+# 可由 tools/build_resource_pack.py 重建的压缩包，以及图像生成阶段的高清原稿。
+sample-pack/BcCyberware-Example-Pack.zip
+sample-pack/source-art/

@@ -1,0 +1,66 @@
+# ============================================================================
+# Core Pack 示例：主动义体
+# ============================================================================
+# 纯服务端无法新增真正的自定义按键。SNEAK_SWAP 表示玩家潜行时按交换副手键；
+# RIGHT_CLICK 表示右键空气或方块。成功触发 SNEAK_SWAP 时插件会取消实际换手。
+
+items:
+  synapse-overclock:
+    slot-type: BRAIN
+    material: PAPER
+    item-model: "bccyberware:synapse_overclock"
+    custom-model-data: 1301
+    capacity-cost: 18
+    display-name: "<light_purple>突触超频核"
+    lore:
+      - "<gray>主动提高神经信号吞吐量。"
+      - "<dark_gray>潜行 + 交换副手：速度与急迫，持续 8 秒。"
+      - "<dark_gray>冷却：30 秒；容量：<aqua><capacity>"
+    triggers:
+      - type: SNEAK_SWAP
+        cooldown: 30s
+        actions:
+          - type: POTION
+            effect: SPEED
+            duration: 8s
+            amplifier: 1
+          - type: POTION
+            effect: HASTE
+            duration: 8s
+            amplifier: 1
+          - type: SOUND
+            sound: BLOCK_BEACON_ACTIVATE
+            volume: 0.8
+            pitch: 1.8
+          - type: ACTION_BAR
+            text: "<light_purple>突触超频已启动"
+
+  arc-pulse-arm:
+    slot-type: RIGHT_ARM
+    material: PAPER
+    item-model: "bccyberware:arc_pulse_arm"
+    custom-model-data: 1302
+    capacity-cost: 16
+    display-name: "<aqua>弧脉冲臂"
+    lore:
+      - "<gray>将积蓄电荷释放到周围目标。"
+      - "<dark_gray>潜行时右键：伤害附近敌对生物。"
+      - "<dark_gray>冷却：18 秒；容量：<aqua><capacity>"
+    triggers:
+      - type: RIGHT_CLICK
+        cooldown: 18s
+        conditions:
+          - type: SNEAKING
+            value: true
+        actions:
+          - type: DAMAGE_NEARBY
+            radius: 4.0
+            amount: 6.0
+            entity-filter: HOSTILE
+          - type: PARTICLE
+            particle: ELECTRIC_SPARK
+            count: 45
+          - type: SOUND
+            sound: ENTITY_LIGHTNING_BOLT_IMPACT
+            volume: 0.8
+            pitch: 1.6

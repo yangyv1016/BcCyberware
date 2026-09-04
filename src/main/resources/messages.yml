@@ -1,0 +1,31 @@
+# ============================================================================
+# 玩家消息
+# ============================================================================
+# 全部文本支持 MiniMessage。可用变量由每条消息旁边的注释说明。
+
+prefix: "<dark_gray>[<aqua>BcCyberware<dark_gray>] <reset>"
+
+no-permission: "<red>你没有执行此操作的权限。"
+player-only: "<red>该命令只能由游戏内玩家执行。"
+profile-loading: "<yellow>你的义体数据仍在加载，请稍后再试。"
+config-reloaded: "<green>全部配置已通过校验并完成原子重载。"
+config-reload-failed: "<red>重载失败，旧配置继续生效。请查看后台错误详情。"
+unknown-cyberware: "<red>找不到义体：<white><id>"
+unknown-player: "<red>找不到在线玩家：<white><player>"
+invalid-number: "<red>数值格式无效：<white><value>"
+item-given: "<green>已给予 <white><player> <aqua><item> <gray>×<amount>。"
+inventory-full: "<red>背包空间不足，操作已完整取消。"
+no-compatible-items: "<yellow>背包中没有可安装到 <white><slot> <yellow>的部件。"
+capacity-insufficient: "<red>容量不足：安装后需要 <used>，你的上限为 <total>。"
+installed: "<green>已将 <item> <green>安装到 <slot>。"
+replaced: "<green>已用 <item> <green>替换 <old>。"
+removed: "<yellow>已拆下 <item>。该部位为空时会产生生理缺点。"
+remove-warning: "<red>再次点击确认拆卸 <item>；部位空缺效果：<white><effects>"
+not-cyberware: "<yellow>你主手中的物品不是由 BcCyberware 签发的部件。"
+inspect-result: "<gray>ID=<id>，槽位类型=<slot>，实例=<instance>，原主人=<owner>"
+resource-pack-loaded: "<green>义体资源包已加载完成。"
+resource-pack-declined: "<red>你拒绝了义体资源包，部分物品将显示为普通载体。"
+resource-pack-failed: "<red>义体资源包下载失败，请联系管理员检查 URL 与 SHA-1。"
+capacity-updated: "<green>已将 <player> 的永久容量调整为 <value>。"
+capacity-result: "<gray><player>：已用 <used> / <total>，其中永久加成 <permanent>。"
+usage: "<yellow>用法：/bccyberware [open|give|capacity|reload|inspect|pack|resourcepack]"

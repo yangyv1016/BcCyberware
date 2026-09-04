@@ -1,0 +1,172 @@
+# ============================================================================
+# BcCyberware 主配置
+# ============================================================================
+# 文件编码：UTF-8
+# 时间格式：20t、5s、2m（t=游戏刻，s=秒，m=分钟；20t=1s）
+# 重载命令：/bccyberware reload
+#
+# 插件重载时会先在内存中完整解析并校验所有 YAML。只有全部文件都有效时才会
+# 替换当前运行配置；若出现错误，后台会指出文件与配置路径，旧配置继续生效。
+# 插件不会自动回写本文件，因此你的注释、排版与字段顺序不会被清除。
+
+# 配置结构版本。用于未来升级提示，请勿手动降低。
+schema-version: 1
+
+general:
+  # 是否在玩家首次建立义体数据时，自动生成并安装 slots.yml 中指定的原生器官。
+  create-default-organs: true
+
+  # 玩家加入后延迟多少时间发送资源包。0s 表示立即发送。
+  resource-pack-delay: 1s
+
+  # 周期能力、空部位缺点与容量阈值的统一扫描频率。
+  # 这里不是每个效果的实际触发间隔；实际间隔由各条规则自己的 interval 决定。
+  # 推荐保持 10t～20t，过低会增加服务器负担。
+  effect-engine-tick: 10t
+
+  # 义体数据写入 SQLite 的合并延迟。短时间内连续换装只执行一次最终写入。
+  save-debounce: 2s
+
+gui:
+  # true：玩家可以通过 /bccyberware 在任何位置打开界面。
+  # false：普通玩家命令会被拒绝，需要其他插件通过 API 打开（例如 Citizens NPC）。
+  command-open-anywhere: true
+
+  # 主菜单行数，合法范围 1～6。默认槽位位置按 6 行设计。
+  rows: 6
+
+  # 主界面标题，支持 MiniMessage。可用变量：<player>、<used>、<total>。
+  title: "<dark_aqua>义体系统 <gray>｜ <white><player>"
+
+  # 候选义体选择界面的标题。
+  selector-title: "<dark_aqua>选择部件 <gray>｜ <white><slot>"
+
+  # 候选义体每页展示多少个。合法范围 1～45。
+  selector-page-size: 45
+
+  # 菜单中没有被身体槽位和功能按钮占用的格子所使用的装饰物。
+  filler:
+    material: BLACK_STAINED_GLASS_PANE
+    name: "<black>."
+
+database:
+  # 首版只支持 SQLITE。文件位于 plugins/BcCyberware/data/players.db。
+  type: SQLITE
+  file: "data/players.db"
+
+capacity:
+  # false 时不检查义体容量，GUI 也会隐藏容量不足警告。
+  enabled: true
+
+  # 未使用任何额外数值源时的基础容量。
+  base: 30.0
+
+  # 是否把管理员通过 capacity set/add 写入的玩家永久容量加入结果。
+  include-player-permanent: true
+
+  # 外部数值源按列表顺序执行。每项先读取 raw value，再用 formula 换算，最后
+  # 按 operation 合并到当前容量。任意来源失败时使用 fallback，不会阻止玩家登录。
+  sources:
+    # 示例：拥有指定权限时增加容量。permissions 中可以写多项，取匹配项中的最大值。
+    - id: permission-bonus
+      enabled: true
+      type: PERMISSION
+      operation: ADD
+      permissions:
+        bccyberware.capacity.10: 10
+        bccyberware.capacity.25: 25
+      formula: "value"
+      min: 0
+      max: 25
+      fallback: 0
+      refresh-interval: 5s
+
+    # 示例：把 mcMMO 总能力等级的 2% 转成义体容量。启用前需安装 mcMMO。
+    - id: mcmmo-power
+      enabled: false
+      type: MCMO_POWER_LEVEL
+      operation: ADD
+      formula: "value * 0.02"
+      min: 0
+      max: 50
+      fallback: 0
+      refresh-interval: 5s
+
+    # 示例：读取 mcMMO 指定技能。skill 使用 mcMMO 的英文技能枚举名。
+    - id: mcmmo-mining
+      enabled: false
+      type: MCMO_SKILL_LEVEL
+      skill: MINING
+      operation: ADD
+      formula: "value / 20"
+      min: 0
+      max: 25
+      fallback: 0
+      refresh-interval: 5s
+
+    # 示例：通过 PlaceholderAPI 读取任意插件提供的数值。
+    # 对应插件与 PlaceholderAPI 扩展必须已经安装；返回非数字时使用 fallback。
+    - id: external-level
+      enabled: false
+      type: PLACEHOLDER
+      placeholder: "%someplugin_player_level%"
+      operation: ADD
+      formula: "value * 1.5"
+      min: 0
+      max: 100
+      fallback: 0
+      refresh-interval: 5s
+
+    # 示例：读取原版计分板 objective。玩家没有分数时使用 fallback。
+    - id: scoreboard-reputation
+      enabled: false
+      type: SCOREBOARD
+      objective: cyber_reputation
+      operation: ADD
+      formula: "value / 10"
+      min: 0
+      max: 30
+      fallback: 0
+      refresh-interval: 5s
+
+  # 周期阈值。metric 合法值：INSTALLED_COUNT、USED_CAPACITY、USED_PERCENT。
+  # comparison 合法值：GTE、GT、LTE、LT、EQ。
+  thresholds:
+    - id: implant-density-warning
+      enabled: true
+      metric: INSTALLED_COUNT
+      comparison: GTE
+      value: 7
+      interval: 30s
+      actions:
+        - type: ACTION_BAR
+          text: "<yellow>你体内的义体密度正在持续升高……"
+        - type: SOUND
+          sound: BLOCK_BEACON_AMBIENT
+          volume: 0.35
+          pitch: 0.65
+
+    - id: capacity-overload
+      enabled: true
+      metric: USED_PERCENT
+      comparison: GTE
+      value: 90
+      interval: 15s
+      actions:
+        - type: POTION
+          effect: NAUSEA
+          duration: 4s
+          amplifier: 0
+          chance: 0.35
+        - type: PARTICLE
+          particle: ELECTRIC_SPARK
+          count: 12
+          chance: 0.6
+
+logging:
+  # true 时输出外部数值源首次失效、资源包失败和配置降级等诊断信息。
+  warn-on-source-failure: true
+
+  # true 时输出周期引擎的详细调试信息。正式服建议保持 false。
+  debug-effects: false
+
