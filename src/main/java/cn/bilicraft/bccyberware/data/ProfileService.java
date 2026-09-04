@@ -86,7 +86,9 @@ public final class ProfileService {
         );
         for (Map.Entry<String, byte[]> entry : stored.installedItems().entrySet()) {
             try {
-                profile.loadInstalled(entry.getKey(), ItemStack.deserializeBytes(entry.getValue()));
+                ItemStack installed = ItemStack.deserializeBytes(entry.getValue());
+                items.normalizeAppearance(installed);
+                profile.loadInstalled(entry.getKey(), installed);
             } catch (RuntimeException exception) {
                 plugin.getLogger().severe("无法反序列化玩家 " + player.getName() + " 槽位 " + entry.getKey()
                         + " 的部件；原始数据库记录未被删除：" + exception.getMessage());

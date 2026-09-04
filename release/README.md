@@ -1,8 +1,9 @@
-# BcCyberware v0.0.7 交付包
+# BcCyberware v0.0.8 交付包
 
 1. 确认服务端为 Paper 1.21.11，使用 Java 21。
-2. 先安装与你的 Paper 版本兼容的 Oraxen，再将 `BcCyberware-0.0.7.jar` 放入服务端
-   `plugins/`。BcCyberware 将 Oraxen 声明为硬依赖，没有 Oraxen 时不会启动。
+2. 将 `BcCyberware-0.0.8.jar` 放入服务端 `plugins/`，不要安装 `sources.jar`。
+   Oraxen 是可选依赖；需要自动合并下发材质时，再安装与你的 Paper 版本兼容的 Oraxen。
+   未安装或未启用 Oraxen 时义体系统仍可运行，没有资源包时显示原版纸张。
 3. 首次启动后编辑 `plugins/BcCyberware/` 中的带注释配置。
 4. 默认材质会自动释放到 `packs/core/Assets/`，并生成到
    `Generation/resource_pack.zip`。
@@ -25,3 +26,9 @@ v0.0.7 起会通过已加载的 Oraxen 实例解析其公开 API，兼容 AsPape
 
 完整配置手册会在首次启动时释放为
 `plugins/BcCyberware/README-配置说明.md`。
+
+升级请停服替换旧主 JAR，保留 `plugins/BcCyberware/` 下的配置和数据库。
+旧物品在登录、打开容器或加载义体档案时更新外观标识，名称、说明、原主人和实例 UUID 不变。
+已加载新包的玩家显示义体材质，未加载/拒绝/下载失败的玩家显示纸张。
+如果关闭了 `generate-on-startup`，升级后执行 `/bccyberware resourcepack generate`；
+旧包不含新纸张选择器，需让 Oraxen 重新生成并按其配置下发。

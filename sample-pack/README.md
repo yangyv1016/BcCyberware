@@ -11,8 +11,11 @@
 
 插件会在首次启动时把默认资源释放到
 `plugins/BcCyberware/packs/core/Assets/`，然后生成
-`plugins/BcCyberware/Generation/resource_pack.zip`。启用部署后默认使用 `SELFHOST`
-模式，由插件自己托管成品，并在玩家加入时自动下发；服主需要在 `resources.yml`
-填写玩家可访问的服务器公网地址、将 `deployment.enabled` 改为 `true`，并放行资源包端口。
+`plugins/BcCyberware/Generation/resource_pack.zip`。这是中间产物，安装并启用 Oraxen 后，
+BcCyberware 会通过其公共生成事件合并到唯一的最终资源包，上传和下发由 Oraxen 负责。
+无需填写 BcCyberware 下载直链或开放额外端口。没有 Oraxen 时仍可使用纸张模式。
+
+v0.0.8 起包含 `assets/minecraft/items/paper.json` 字符串选择器。客户端没有加载资源包时
+物品显示原版纸张；加载后使用对应义体材质。插件注入时会保留 Oraxen 原有纸张模型规则。
 
 这些图标为本项目生成的原创资产，没有使用《赛博朋克 2077》的名称、描述、图标或模型。

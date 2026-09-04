@@ -11,6 +11,7 @@ import cn.bilicraft.bccyberware.effect.CyberwareEventListener;
 import cn.bilicraft.bccyberware.effect.EffectEngine;
 import cn.bilicraft.bccyberware.gui.MenuService;
 import cn.bilicraft.bccyberware.item.ItemService;
+import cn.bilicraft.bccyberware.item.ItemAppearanceListener;
 import cn.bilicraft.bccyberware.resourcepack.ResourcePackService;
 import cn.bilicraft.bccyberware.text.TextService;
 import org.bukkit.Bukkit;
@@ -60,6 +61,13 @@ public final class BcCyberwarePlugin extends JavaPlugin {
 
         Bukkit.getPluginManager().registerEvents(events, this);
         Bukkit.getPluginManager().registerEvents(menus, this);
+        ItemAppearanceListener appearances = new ItemAppearanceListener(items);
+        Bukkit.getPluginManager().registerEvents(appearances, this);
+        Bukkit.getOnlinePlayers().forEach(player -> {
+            appearances.normalize(player.getInventory());
+            appearances.normalize(player.getEnderChest());
+        });
+        Bukkit.getWorlds().forEach(world -> world.getEntities().forEach(appearances::normalize));
         if (!resourcePacks.start()) {
             getLogger().warning("义体功能继续运行，但资源包生成或 Oraxen 注入当前不可用。请检查 resources.yml。 ");
         }

@@ -4,8 +4,8 @@ main: cn.bilicraft.bccyberware.BcCyberwarePlugin
 description: 可配置的 Paper 义体、原生器官、容量与身体状态系统
 api-version: '1.21.11'
 authors: [BiliCraft]
-depend: [Oraxen]
-softdepend: [PlaceholderAPI, mcMMO, Citizens]
+# Oraxen 只负责可选资源包；未安装或启用失败时，义体以原版纸张外观运行。
+softdepend: [Oraxen, PlaceholderAPI, mcMMO, Citizens]
 
 commands:
   bccyberware:

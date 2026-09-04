@@ -1,0 +1,139 @@
+{
+  "model": {
+    "type": "minecraft:select",
+    "property": "minecraft:custom_model_data",
+    "index": 0,
+    "cases": [
+      {
+        "when": "bccyberware/bccyberware:adrenal_reservoir",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/adrenal_reservoir"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:arc_pulse_arm",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/arc_pulse_arm"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:carbon_lattice",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/carbon_lattice"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:native_brain",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/native_brain"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:native_eyes",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/native_eyes"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:native_heart",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/native_heart"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:native_left_arm",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/native_left_arm"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:native_left_leg",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/native_left_leg"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:native_nerves",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/native_nerves"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:native_right_arm",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/native_right_arm"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:native_right_leg",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/native_right_leg"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:native_skeleton",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/native_skeleton"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:native_skin",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/native_skin"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:nociception_gate",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/nociception_gate"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:predictive_optics",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/predictive_optics"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:prism_dermis",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/prism_dermis"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:pulseforge_heart",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/pulseforge_heart"
+        }
+      },
+      {
+        "when": "bccyberware/bccyberware:synapse_overclock",
+        "model": {
+          "type": "minecraft:model",
+          "model": "bccyberware:item/synapse_overclock"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/paper"
+    }
+  }
+}

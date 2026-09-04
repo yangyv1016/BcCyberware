@@ -103,7 +103,12 @@ items:
 ```
 
 - `material`：义体的原版载体，默认 `PAPER`，可修改为其他合法 Material。
-- `item-model`：Paper 1.21.11 的 item model 键，推荐为资源包中的完整命名空间 ID。
+- `item-model`：资源包中的完整物品定义 ID，如 `my_pack:example_optics`，对应
+  `Assets/assets/my_pack/items/example_optics.json`。v0.0.8 起由生成器将该文件的 `model`
+  接入纸张选择器，而不是把自定义键直接写入物品；没有资源包时显示原版纸张。
+  CustomModelData 的 `strings[0]` 保留给插件，格式为 `bccyberware/<item-model>`；
+  数字、布尔、颜色和其余字符串不受迁移影响。物理 `material` 配置仍保留，但基础外观统一为纸张。
+  未提供对应物品定义文件时，该分支同样显示纸张；模型及纹理文件请一起放入本插件 Assets。
 - `custom-model-data`：保留用于兼容服主已有的模型分配；物品身份不依赖它。
 - `capacity-cost`：占用容量，可为 0。
 - `original-organ: true`：创建时必须绑定原始主人 UUID 和姓名。它仍是可自由交易、
@@ -207,7 +212,7 @@ plugins/BcCyberware/packs/example/Assets/
 插件在后台按 Pack 的 `priority` 合并这些目录，再用 `Generation/merge/` 中的服主文件执行
 最终覆盖，输出为 `Generation/resource_pack.zip`。
 
-BcCyberware 将 Oraxen 声明为硬依赖，并使用 Oraxen 官方公开的资源包生成事件。为兼容
+BcCyberware 将 Oraxen 声明为可选依赖，并使用 Oraxen 官方公开的资源包生成事件。为兼容
 AsPaper 等严格隔离插件类路径的服务端，运行时会从已启用的 Oraxen 实例取得它自己的
 类加载器，再解析公开 API；Oraxen 类不会被复制到 BcCyberware JAR。`resources.yml`
 默认配置如下：
@@ -224,6 +229,11 @@ BcCyberware 完成本地合并后，只读取中间 ZIP 内的 `assets/` 文件�
 因此 BcCyberware 的 `Generation/merge/` 仍然是其自身资源的最终覆盖层。建议所有义体资源
 使用独立的 `bccyberware` 命名空间，避免和服主已有 Oraxen 资源发生冲突。
 
+`assets/minecraft/items/paper.json` 是上述覆盖规则的特例：生成器自动追加义体的字符串
+模型选择规则，注入时把 Oraxen 原来的 `model` 保留为 fallback，并保留顶层设置。
+不会替换 Oraxen 原有的数字模型编号，也不会影响普通纸张。重复生成不会叠加同一层规则。
+客户端没有加载资源包、拒绝或下载失败时直接使用内置纸张模型，无须服务器轮询玩家状态。
+
 `reload-after-generation=true` 时，BcCyberware 会调用官方 `OraxenPack.reloadPack()`。
 若 Oraxen 启动时正在生成，BcCyberware 会等待其上传事件后重试，直到自己的资源真正进入
 一次生成事件。Oraxen 随后按 `plugins/Oraxen/settings.yml` 的 `Pack.upload` 与
@@ -231,8 +241,13 @@ BcCyberware 完成本地合并后，只读取中间 ZIP 内的 `assets/` 文件�
 不要求下载直链，也不会调用 Paper 的资源包发送接口再发第二份包。
 
 若临时设置 `oraxen.enabled=false`，BcCyberware 会停止注入，并在允许自动重载时触发 Oraxen
-重建，以便从最终包中移除旧的义体资源。Oraxen 是插件硬依赖；没有 Oraxen 时 Paper 会阻止
-BcCyberware 启动。
+重建，以便从最终包中移除旧的义体资源。没有 Oraxen 或 Oraxen 启动失败时，BcCyberware
+仍能启动并运行纸张模式，不会调度 Oraxen 重试任务，也不会单独发送资源包。
+
+从旧版升级只需停服替换主 JAR，保留数据与配置。背包和末影箱在登录时、容器在打开时、
+已安装部件在档案加载时自动迁移外观，不重建部件 UUID，不改变原主人、名称、说明和数量。
+若 `generate-on-startup=false`，升级后执行 `/bccyberware resourcepack generate` 更新模型选择器。
+服主自己编辑了损坏的模型或纹理时仍应修复资源文件；纸张回退不等于任意错误资源包校验器。
 
 默认核心材质会从插件 JAR 自动释放到 `packs/core/Assets/`，已存在的服主文件不会被覆盖。
 旧 `external-packs` 列表不再支持，非空配置会拒绝加载并指向统一合并迁移方式。

@@ -69,12 +69,7 @@ public final class ItemService {
         meta.lore(lore);
         meta.setMaxStackSize(1);
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
-        if (!definition.itemModel().isEmpty()) {
-            NamespacedKey model = NamespacedKey.fromString(definition.itemModel());
-            if (model != null) {
-                meta.setItemModel(model);
-            }
-        }
+        ItemAppearance.apply(meta, definition.itemModel(), definition.material());
         if (definition.customModelData() != null && definition.customModelData() > 0) {
             var customModelData = meta.getCustomModelDataComponent();
             customModelData.setFloats(List.of(definition.customModelData().floatValue()));
@@ -125,7 +120,22 @@ public final class ItemService {
     public ItemStack displayCopy(ItemStack source) {
         ItemStack copy = source.clone();
         copy.setAmount(1);
+        normalizeAppearance(copy);
         return copy;
+    }
+
+    /** Migrates only appearance; never recreate an item or change its identity/owner. */
+    public boolean normalizeAppearance(ItemStack item) {
+        if (inspect(item).isEmpty()) {
+            return false;
+        }
+        ItemMeta meta = item.getItemMeta();
+        String model = definition(item).map(ItemDefinition::itemModel).orElse("");
+        if (!ItemAppearance.apply(meta, model, item.getType())) {
+            return false;
+        }
+        item.setItemMeta(meta);
+        return true;
     }
 
     private static UUID parseUuid(String value) {

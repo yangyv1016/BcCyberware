@@ -45,12 +45,16 @@ public final class ResourcePackService {
         this.generator = new ResourcePackGenerator(plugin.getDataFolder().toPath());
         OraxenApiBridge connected = null;
         try {
-            connected = OraxenApiBridge.connect(plugin, this::onOraxenPackGenerated, this::onOraxenPackUploaded);
-            plugin.getLogger().info("已连接 Oraxen " + connected.version()
-                    + " 公共资源包 API（兼容隔离类加载器）。");
+            if (Bukkit.getPluginManager().isPluginEnabled("Oraxen")) {
+                connected = OraxenApiBridge.connect(plugin, this::onOraxenPackGenerated, this::onOraxenPackUploaded);
+                plugin.getLogger().info("已连接 Oraxen " + connected.version()
+                        + " 公共资源包 API（兼容隔离类加载器）。");
+            } else {
+                plugin.getLogger().info("Oraxen 未安装或未启用：义体以纸张外观运行，不下发额外资源包。");
+            }
         } catch (OraxenApiBridge.IntegrationException | LinkageError | RuntimeException exception) {
-            plugin.getLogger().log(Level.SEVERE,
-                    "无法连接 Oraxen 公共资源包 API；义体功能可以继续运行，但资源不会注入："
+            plugin.getLogger().log(Level.WARNING,
+                    "无法连接 Oraxen 公共资源包 API；义体以纸张外观继续运行，资源不会注入："
                             + exception.getMessage(), exception);
         }
         this.oraxen = connected;
@@ -126,13 +130,13 @@ public final class ResourcePackService {
                     if (closed || operationEpoch.get() != ticket || configs.current() != snapshot) {
                         plugin.getLogger().warning("资源包生成期间配置已变化，结果未注入 Oraxen；请重新执行重载。");
                     } else {
-                        activeAssets = settings.oraxenIntegrationEnabled()
+                        activeAssets = settings.oraxenIntegrationEnabled() && oraxen != null
                                 ? immutableCopy(prepared.assets())
                                 : Map.of();
                         plugin.getLogger().info("BcCyberware 资源已准备：" + prepared.pack().file()
                                 + "，SHA-1 " + prepared.pack().sha1Hex()
                                 + "，可注入文件 " + activeAssets.size() + " 个。");
-                        if (settings.reloadOraxenAfterGeneration()) {
+                        if (oraxen != null && settings.reloadOraxenAfterGeneration()) {
                             requestOraxenReload();
                         }
                         success = true;
@@ -236,7 +240,8 @@ public final class ResourcePackService {
     }
 
     public void send(Player player) {
-        text.send(player, "resource-pack-managed-by-oraxen");
+        text.send(player, oraxen != null && configs.current().resourcePackDeployment().oraxenIntegrationEnabled()
+                ? "resource-pack-managed-by-oraxen" : "resource-pack-paper-mode");
     }
 
     private void finish(Consumer<Boolean> completion, boolean success) {

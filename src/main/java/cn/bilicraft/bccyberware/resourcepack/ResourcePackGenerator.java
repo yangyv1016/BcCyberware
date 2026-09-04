@@ -48,6 +48,7 @@ public final class ResourcePackGenerator {
             Path mergeDirectory = resolveInsideDataDirectory(snapshot.resourcePackDeployment().mergeDirectory());
             copyTree(mergeDirectory, staging);
             validatePack(staging);
+            PaperModelRouter.generate(staging, snapshot.items().values());
 
             Files.createDirectories(output.getParent());
             temporaryZip = Files.createTempFile(output.getParent(), ".bccyberware-resource-pack-", ".zip.tmp");

@@ -276,7 +276,7 @@ public final class CyberwareCommand implements CommandExecutor, TabCompleter {
         if (args.length >= 2 && args[1].equalsIgnoreCase("generate")) {
             boolean scheduled = resourcePacks.generateAsync(success -> text.send(
                     sender,
-                    success ? "resource-pack-generated" : "resource-pack-generate-failed"
+                    success ? "resource-pack-prepared" : "resource-pack-generate-failed"
             ));
             if (scheduled) {
                 text.send(sender, "resource-pack-generation-started");

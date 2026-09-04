@@ -17,6 +17,48 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class OraxenApiBridgeTest {
     @Test
+    void mergesPaperDefinitionThroughRealVirtualFileAndCanRepeat() throws Exception {
+        ClassLoader loader = Thread.currentThread().getContextClassLoader();
+        var access = OraxenApiBridge.ReflectionAccess.resolve(loader);
+        Class<?> type = Class.forName("io.th0rgal.oraxen.utils.VirtualFile", false, loader);
+        Constructor<?> constructor = type.getConstructor(String.class, String.class, InputStream.class);
+        byte[] original = """
+                {"hand_animation_on_swap":false,"model":{"type":"minecraft:model","model":"oraxen:item/kept"}}
+                """.getBytes(StandardCharsets.UTF_8);
+        byte[] incoming = """
+                {"model":{"type":"minecraft:select","property":"minecraft:custom_model_data","index":0,
+                "cases":[{"when":"bccyberware/test:heart","model":{"type":"minecraft:model","model":"test:item/heart"}}],
+                "fallback":{"type":"minecraft:model","model":"minecraft:item/paper"}}}
+                """.getBytes(StandardCharsets.UTF_8);
+        List<Object> output = new ArrayList<>();
+        output.add(constructor.newInstance("assets/minecraft/items", "paper.json",
+                new java.io.ByteArrayInputStream(original)));
+        Object event = access.generatedEventType().getConstructor(List.class).newInstance(output);
+        Map<String, byte[]> assets = Map.of(PaperModelRouter.PATH, incoming);
+        access.injectAssets(event, assets);
+        access.injectAssets(event, assets);
+        assertEquals(1, output.size());
+        InputStream stream = (InputStream) type.getMethod("getInputStream").invoke(output.getFirst());
+        assertArrayEquals(PaperModelRouter.merge(incoming, original), stream.readAllBytes());
+    }
+
+    @Test
+    void invalidPaperMergeDoesNotRemoveExistingOutput() throws Exception {
+        ClassLoader loader = Thread.currentThread().getContextClassLoader();
+        var access = OraxenApiBridge.ReflectionAccess.resolve(loader);
+        Class<?> type = Class.forName("io.th0rgal.oraxen.utils.VirtualFile", false, loader);
+        Object original = type.getConstructor(String.class, String.class, InputStream.class).newInstance(
+                "assets/minecraft/items", "paper.json", new java.io.ByteArrayInputStream("{}".getBytes(StandardCharsets.UTF_8)));
+        List<Object> output = new ArrayList<>(List.of(original));
+        Object event = access.generatedEventType().getConstructor(List.class).newInstance(output);
+        assertThrows(OraxenApiBridge.IntegrationException.class,
+                () -> access.injectAssets(event, Map.of(PaperModelRouter.PATH, new byte[0])));
+        assertEquals(List.of(original), output);
+        InputStream stream = (InputStream) type.getMethod("getInputStream").invoke(original);
+        assertArrayEquals("{}".getBytes(StandardCharsets.UTF_8), stream.readAllBytes());
+    }
+
+    @Test
     void resolvesOfficialApiAndReplacesMatchingVirtualFiles() throws Exception {
         ClassLoader loader = Thread.currentThread().getContextClassLoader();
         OraxenApiBridge.ReflectionAccess access = OraxenApiBridge.ReflectionAccess.resolve(loader);

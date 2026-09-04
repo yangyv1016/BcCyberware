@@ -9,10 +9,13 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Iterator;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -97,6 +100,7 @@ final class OraxenApiBridge {
         private final Method generatedOutput;
         private final Constructor<?> virtualFileConstructor;
         private final Method virtualFilePath;
+        private final Method virtualFileInput;
 
         private ReflectionAccess(
                 Method reloadPack,
@@ -104,7 +108,8 @@ final class OraxenApiBridge {
                 Class<? extends Event> uploadedEventType,
                 Method generatedOutput,
                 Constructor<?> virtualFileConstructor,
-                Method virtualFilePath
+                Method virtualFilePath,
+                Method virtualFileInput
         ) {
             this.reloadPack = reloadPack;
             this.generatedEventType = generatedEventType;
@@ -112,6 +117,7 @@ final class OraxenApiBridge {
             this.generatedOutput = generatedOutput;
             this.virtualFileConstructor = virtualFileConstructor;
             this.virtualFilePath = virtualFilePath;
+            this.virtualFileInput = virtualFileInput;
         }
 
         static ReflectionAccess resolve(ClassLoader loader) throws IntegrationException {
@@ -127,7 +133,8 @@ final class OraxenApiBridge {
                         uploadedEvent,
                         generatedEvent.getMethod("getOutput"),
                         virtualFile.getConstructor(String.class, String.class, InputStream.class),
-                        virtualFile.getMethod("getPath")
+                        virtualFile.getMethod("getPath"),
+                        virtualFile.getMethod("getInputStream")
                 );
             } catch (ClassNotFoundException exception) {
                 throw new IntegrationException("当前 Oraxen 缺少公共 API 类 " + exception.getMessage()
@@ -173,22 +180,44 @@ final class OraxenApiBridge {
 
             @SuppressWarnings("unchecked")
             List<Object> output = (List<Object>) rawList;
+            Map<String, byte[]> merged = new LinkedHashMap<>(assets);
+            List<Object> replaced = new ArrayList<>();
+            // Build everything first: malformed JSON must not partially remove Oraxen assets.
             Iterator<Object> iterator = output.iterator();
             while (iterator.hasNext()) {
                 Object virtualFile = iterator.next();
                 Object rawPath = invoke(virtualFilePath, virtualFile);
                 if (rawPath instanceof String path && assets.containsKey(path)) {
-                    iterator.remove();
+                    if (PaperModelRouter.PATH.equals(path)) {
+                        InputStream stream = (InputStream) invoke(virtualFileInput, virtualFile);
+                        if (!stream.markSupported()) {
+                            throw new IntegrationException("Oraxen paper.json 的输入流不支持安全读取与复位");
+                        }
+                        stream.mark(Integer.MAX_VALUE);
+                        try {
+                            merged.put(path, PaperModelRouter.merge(assets.get(path), stream.readAllBytes()));
+                        } catch (IOException | RuntimeException exception) {
+                            throw new IntegrationException("合并 Oraxen 纸张模型失败：" + exception.getMessage(), exception);
+                        } finally {
+                            try {
+                                stream.reset();
+                            } catch (IOException exception) {
+                                throw new IntegrationException("复位 Oraxen 纸张模型输入流失败", exception);
+                            }
+                        }
+                    }
+                    replaced.add(virtualFile);
                 }
             }
 
-            for (Map.Entry<String, byte[]> asset : assets.entrySet()) {
+            List<Object> additions = new ArrayList<>();
+            for (Map.Entry<String, byte[]> asset : merged.entrySet()) {
                 String path = asset.getKey();
                 int separator = path.lastIndexOf('/');
                 String parent = separator < 0 ? "" : path.substring(0, separator);
                 String name = separator < 0 ? path : path.substring(separator + 1);
                 try {
-                    output.add(virtualFileConstructor.newInstance(
+                    additions.add(virtualFileConstructor.newInstance(
                             parent,
                             name,
                             new ByteArrayInputStream(asset.getValue())
@@ -197,6 +226,8 @@ final class OraxenApiBridge {
                     throw reflectionFailure("创建 Oraxen VirtualFile", exception);
                 }
             }
+            output.removeAll(replaced);
+            output.addAll(additions);
         }
 
         private static Object invoke(Method method, Object target, Object... arguments)

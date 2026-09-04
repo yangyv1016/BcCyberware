@@ -153,6 +153,23 @@ def build() -> None:
 
     validate_pack_tree()
 
+    # A vanilla paper model is always available without this pack. Our optional
+    # string selector changes only BcCyberware items when the pack is loaded.
+    json_write(
+        PACK_ROOT / "assets" / "minecraft" / "items" / "paper.json",
+        {"model": {
+            "type": "minecraft:select",
+            "property": "minecraft:custom_model_data",
+            "index": 0,
+            "cases": [
+                {"when": f"bccyberware/bccyberware:{name}",
+                 "model": {"type": "minecraft:model", "model": f"bccyberware:item/{name}"}}
+                for name in sorted((*DIRECT_ASSETS, *MIRRORED_ASSETS.keys()))
+            ],
+            "fallback": {"type": "minecraft:model", "model": "minecraft:item/paper"},
+        }},
+    )
+
     if ZIP_PATH.exists():
         ZIP_PATH.unlink()
     with zipfile.ZipFile(ZIP_PATH, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:

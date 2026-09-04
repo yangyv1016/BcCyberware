@@ -23,6 +23,8 @@ oraxen:
   # true：把 BcCyberware 生成的 assets/ 文件注入 Oraxen 的最终资源包。
   # 本插件不监听 HTTP 端口，也不会单独向玩家发送第二份资源包。
   # Oraxen 负责最终 ZIP、上传、SHA-1、提示和进服自动下发。
+  # Oraxen 可选：未安装/未启用时仍可运行。客户端未加载资源包时显示原版纸张。
+  # 纸张选择器自动生成；注入时保留 Oraxen 已有纸张模型，不占用其数字模型编号。
   enabled: true
 
   # true：生成完成后调用 OraxenPack.reloadPack()，立即重建 Oraxen 最终包。
