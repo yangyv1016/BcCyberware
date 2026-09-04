@@ -33,8 +33,12 @@ jobs:
       - name: Install resource-pack tooling
         run: python -m pip install --disable-pip-version-check pillow
 
-      - name: Build resource pack
-        run: python tools/build_resource_pack.py
+      - name: Build and verify resource pack
+        run: |
+          python tools/build_resource_pack.py
+          git diff --exit-code -- \
+            sample-pack/BcCyberware-Example-Pack.zip \
+            sample-pack/BcCyberware-Example-Pack.sha1
 
       - name: Test and build plugin
         run: |

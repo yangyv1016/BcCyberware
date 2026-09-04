@@ -2,6 +2,11 @@
 
 本项目遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## v0.0.3 - 2026-09-04
+
+- 固定示例资源包的 ZIP 平台元数据，使 Windows 与 GitHub Actions 生成完全相同的文件和 SHA-1；
+- 交付说明改为引用 Release 同批生成的校验文件，避免文档写死某次本机构建哈希。
+
 ## v0.0.2 - 2026-09-04
 
 - 采用 MythicMobs + MythicCrucible 风格的资源资产工作流；

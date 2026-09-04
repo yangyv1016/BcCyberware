@@ -23,7 +23,7 @@
 .\gradlew.bat clean test build
 ```
 
-产物位于 `build/libs/BcCyberware-0.0.2.jar`。首次启动后，默认配置和核心 Pack 的 Assets 会释放到 `plugins/BcCyberware/`；插件不会在读取或重载时回写 YAML，因此服主注释不会被清除。
+产物位于 `build/libs/BcCyberware-0.0.3.jar`。首次启动后，默认配置和核心 Pack 的 Assets 会释放到 `plugins/BcCyberware/`；插件不会在读取或重载时回写 YAML，因此服主注释不会被清除。
 
 ## 主要命令
 

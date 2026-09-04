@@ -160,6 +160,9 @@ def build() -> None:
             if path.is_file():
                 relative = path.relative_to(PACK_ROOT).as_posix()
                 info = zipfile.ZipInfo(relative, date_time=(2026, 1, 1, 0, 0, 0))
+                # ZipInfo 会按宿主系统选择 0 (Windows) 或 3 (Unix)。固定为 Unix，
+                # 让 Windows 本机构建与 GitHub Actions 的 ZIP 字节及 SHA-1 完全一致。
+                info.create_system = 3
                 info.compress_type = zipfile.ZIP_DEFLATED
                 info.external_attr = 0o100644 << 16
                 archive.writestr(info, path.read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
