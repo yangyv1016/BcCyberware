@@ -73,7 +73,13 @@ def normalize_icon(source: Path, destination: Path, mirror: bool = False) -> Non
     canvas.save(destination, format="PNG", optimize=True)
 
 
-def build() -> None:
+def source_art_available() -> bool:
+    required_sources = {f"{name}.png" for name in DIRECT_ASSETS}
+    required_sources.update(f"{name}.png" for name in MIRRORED_ASSETS.values())
+    return all((SOURCE_ROOT / filename).is_file() for filename in required_sources)
+
+
+def render_pack_from_source_art() -> None:
     if PACK_ROOT.exists():
         shutil.rmtree(PACK_ROOT)
     TEXTURE_ROOT.mkdir(parents=True)
@@ -120,6 +126,33 @@ def build() -> None:
     )
     normalize_icon(SOURCE_ROOT / "pulseforge_heart.png", PACK_ROOT / "pack.png")
 
+
+def validate_pack_tree() -> None:
+    all_assets = (*DIRECT_ASSETS, *MIRRORED_ASSETS.keys())
+    required_files = [PACK_ROOT / "pack.mcmeta", PACK_ROOT / "pack.png"]
+    for name in all_assets:
+        required_files.extend(
+            (
+                TEXTURE_ROOT / f"{name}.png",
+                MODEL_ROOT / f"{name}.json",
+                ITEM_ROOT / f"{name}.json",
+            )
+        )
+    missing = [str(path.relative_to(ROOT)) for path in required_files if not path.is_file()]
+    if missing:
+        raise FileNotFoundError("资源包缺少必要文件：\n- " + "\n- ".join(missing))
+
+
+def build() -> None:
+    if source_art_available():
+        render_pack_from_source_art()
+        mode = "rendered from source art"
+    else:
+        # CI 不携带体积较大的生成阶段原稿；直接验证并封装仓库中已审核的 64x64 成品。
+        mode = "packaged from checked-in assets"
+
+    validate_pack_tree()
+
     if ZIP_PATH.exists():
         ZIP_PATH.unlink()
     with zipfile.ZipFile(ZIP_PATH, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
@@ -134,8 +167,9 @@ def build() -> None:
     digest = hashlib.sha1(ZIP_PATH.read_bytes()).hexdigest()
     SHA1_PATH.write_text(digest + "\n", encoding="ascii", newline="\n")
     print(f"Built {ZIP_PATH}")
+    print(f"Mode {mode}")
     print(f"SHA-1 {digest}")
-    print(f"Textures {len(all_assets)}")
+    print(f"Textures {len((*DIRECT_ASSETS, *MIRRORED_ASSETS.keys()))}")
 
 
 if __name__ == "__main__":

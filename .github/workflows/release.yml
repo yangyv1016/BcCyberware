@@ -1,0 +1,75 @@
+name: Build and release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, test and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install resource-pack tooling
+        run: python -m pip install --disable-pip-version-check pillow
+
+      - name: Test and build plugin
+        run: |
+          chmod +x ./gradlew
+          ./gradlew clean test build --no-daemon --warning-mode all
+
+      - name: Build resource pack
+        run: python tools/build_resource_pack.py
+
+      - name: Assemble release files
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          cp "build/libs/BcCyberware-${VERSION}.jar" dist/
+          cp "build/libs/BcCyberware-${VERSION}-sources.jar" dist/
+          cp sample-pack/BcCyberware-Example-Pack.zip dist/
+          (
+            cd dist
+            sha256sum "BcCyberware-${VERSION}.jar" "BcCyberware-${VERSION}-sources.jar" > SHA256SUMS.txt
+            sha1sum BcCyberware-Example-Pack.zip > RESOURCE_PACK_SHA1.txt
+          )
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BcCyberware-${{ github.ref_name }}
+          path: dist/
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "BcCyberware $GITHUB_REF_NAME" \
+            --notes-file CHANGELOG.md \
+            --verify-tag
