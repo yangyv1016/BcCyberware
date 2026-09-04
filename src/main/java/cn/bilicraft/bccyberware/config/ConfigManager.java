@@ -58,8 +58,8 @@ public final class ConfigManager {
         }
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(resourceConfig);
         if (!yaml.isConfigurationSection("generation") && !yaml.isConfigurationSection("deployment")) {
-            plugin.getLogger().warning("检测到 v0.0.1 格式的 resources.yml：旧外部 URL 配置继续兼容，"
-                    + "但 Pack Assets 生成与 SELFHOST 不会自动启用。请参考最新 Release 中的示例配置迁移。");
+            plugin.getLogger().warning("检测到 v0.0.1 格式的 resources.yml：旧版逐包 URL 下发已移除。"
+                    + "请把资源放入 Pack Assets 或 Generation/merge，并参考最新 Release 配置启用统一资源包管理。");
         }
     }
 

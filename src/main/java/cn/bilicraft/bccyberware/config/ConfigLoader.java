@@ -7,7 +7,6 @@ import cn.bilicraft.bccyberware.config.model.ConfigSnapshot;
 import cn.bilicraft.bccyberware.config.model.GuiSettings;
 import cn.bilicraft.bccyberware.config.model.ItemDefinition;
 import cn.bilicraft.bccyberware.config.model.PackDefinition;
-import cn.bilicraft.bccyberware.config.model.ResourcePackSpec;
 import cn.bilicraft.bccyberware.config.model.ResourcePackDeploymentSettings;
 import cn.bilicraft.bccyberware.config.model.ResourcePackDeploymentType;
 import cn.bilicraft.bccyberware.config.model.SlotDefinition;
@@ -108,8 +107,7 @@ final class ConfigLoader {
 
         YamlConfiguration resourcePackYaml = yaml(dataDirectory.resolve("resources.yml"), "resources.yml");
         ResourcePackDeploymentSettings resourcePackDeployment = loadResourcePackDeployment(resourcePackYaml);
-        ResourcePackLoadResult resourcePacks = activeResourcePacks(loadResourcePacks(resourcePackYaml), orderedPacks);
-        validateResourcePackUuids(resourcePackDeployment, resourcePacks);
+        validateNoLegacyPackDownloads(resourcePackYaml, orderedPacks);
         Map<String, String> messages = loadMessages();
 
         return new ConfigSnapshot(
@@ -127,8 +125,6 @@ final class ConfigLoader {
                 slots,
                 items,
                 resourcePackDeployment,
-                resourcePacks.enabled,
-                resourcePacks.packs,
                 messages
         );
     }
@@ -271,8 +267,7 @@ final class ConfigLoader {
                     yaml.getInt("priority", 0),
                     lowerList(yaml.getStringList("depends")),
                     lowerList(yaml.getStringList("soft-depends")),
-                    yaml.getBoolean("allow-overrides", false),
-                    lowerList(yaml.getStringList("resource-packs"))
+                    yaml.getBoolean("allow-overrides", false)
             );
             if (result.putIfAbsent(id, pack) != null) {
                 throw error(relative, "id", "Pack ID 重复：" + id);
@@ -515,7 +510,7 @@ final class ConfigLoader {
 
         ResourcePackDeploymentType type = enumValue(
                 ResourcePackDeploymentType.class,
-                yaml.getString("deployment.type", "SELFHOST"),
+                yaml.getString("deployment.type", "RESOURCE_PACK_MANAGER"),
                 file,
                 "deployment.type"
         );
@@ -523,7 +518,8 @@ final class ConfigLoader {
         String publicUrl = yaml.getString("deployment.auto-send.public-url", "").trim();
         boolean deploymentEnabled = yaml.getBoolean("deployment.enabled", false);
         boolean autoSendEnabled = yaml.getBoolean("deployment.auto-send.enabled", true);
-        if (deploymentEnabled && publicUrl.isEmpty()) {
+        if (deploymentEnabled && type != ResourcePackDeploymentType.RESOURCE_PACK_MANAGER
+                && publicUrl.isEmpty()) {
             throw error(file, "deployment.auto-send.public-url",
                     "启用部署时需要填写玩家可访问的 http:// 或 https:// 地址");
         }
@@ -584,86 +580,25 @@ final class ConfigLoader {
         return resolved;
     }
 
-    private ResourcePackLoadResult loadResourcePacks(YamlConfiguration yaml) throws ConfigException {
-        String file = "resources.yml";
-        boolean modernLayout = yaml.isConfigurationSection("external-packs");
-        String root = modernLayout ? "external-packs" : "";
-        boolean enabled = yaml.getBoolean(modernLayout ? root + ".enabled" : "enabled", false);
-        List<ResourcePackSpec> packs = new ArrayList<>();
-        Set<String> ids = new HashSet<>();
-        List<Map<?, ?>> maps = yaml.getMapList(modernLayout ? root + ".packs" : "packs");
-        for (int index = 0; index < maps.size(); index++) {
-            String path = (modernLayout ? "external-packs.packs[" : "packs[") + index + "]";
-            Map<String, Object> values = stringMap(maps.get(index));
-            String id = mapString(values, "id", null);
-            validateLocalId(file, path + ".id", id);
-            if (!ids.add(id)) {
-                throw error(file, path + ".id", "资源包 ID 重复：" + id);
-            }
-            UUID uuid;
-            try {
-                uuid = UUID.fromString(mapString(values, "uuid", ""));
-            } catch (IllegalArgumentException exception) {
-                throw new ConfigException(file, path + ".uuid", "需要标准 UUID", exception);
-            }
-            String url = mapString(values, "url", "");
-            validateHttpUrl(file, path + ".url", url, false);
-            String hash = mapString(values, "sha1", "");
-            if (!hash.matches("[0-9a-fA-F]{40}")) {
-                throw error(file, path + ".sha1", "需要 40 位十六进制 SHA-1");
-            }
-            packs.add(new ResourcePackSpec(
-                    id,
-                    uuid,
-                    url,
-                    hex(hash),
-                    mapBoolean(values, "required", false),
-                    mapString(values, "prompt", "")
-            ));
-        }
-        if (enabled && packs.isEmpty()) {
-            throw error(file, "packs", "enabled=true 时至少需要一个资源包");
-        }
-        return new ResourcePackLoadResult(enabled, packs);
-    }
-
-    private ResourcePackLoadResult activeResourcePacks(
-            ResourcePackLoadResult configured,
+    private void validateNoLegacyPackDownloads(
+            YamlConfiguration yaml,
             List<PackDefinition> loadedPacks
     ) throws ConfigException {
-        if (!configured.enabled) {
-            return configured;
+        boolean legacyConfigured = yaml.getBoolean("enabled", false)
+                || !yaml.getMapList("packs").isEmpty()
+                || yaml.getBoolean("external-packs.enabled", false)
+                || !yaml.getMapList("external-packs.packs").isEmpty();
+        if (legacyConfigured) {
+            throw error("resources.yml", "external-packs",
+                    "BcCyberware 不再逐包下发外部资源包。请将资源放入内容 Pack 的 Assets/ 或 "
+                            + "Generation/merge/，再由 RESOURCE_PACK_MANAGER 统一合并和发送");
         }
-        Set<String> requested = new LinkedHashSet<>();
-        loadedPacks.forEach(pack -> requested.addAll(pack.resourcePacks()));
-        if (requested.isEmpty()) {
-            return configured;
-        }
-        Set<String> available = new HashSet<>();
-        configured.packs.forEach(pack -> available.add(pack.id()));
-        for (String id : requested) {
-            if (!available.contains(id)) {
-                throw error("resources.yml", "packs", "已启用的内容 Pack 引用了未声明的资源包：" + id);
-            }
-        }
-        List<ResourcePackSpec> selected = configured.packs.stream()
-                .filter(pack -> requested.contains(pack.id()))
-                .toList();
-        return new ResourcePackLoadResult(true, selected);
-    }
-
-    private void validateResourcePackUuids(
-            ResourcePackDeploymentSettings deployment,
-            ResourcePackLoadResult external
-    ) throws ConfigException {
-        Set<UUID> uuids = new HashSet<>();
-        if (deployment.deploymentEnabled()) {
-            uuids.add(deployment.uuid());
-        }
-        for (ResourcePackSpec pack : external.packs()) {
-            if (!uuids.add(pack.uuid())) {
-                throw error("resources.yml", "external-packs.packs",
-                        "生成资源包与额外外部资源包的 UUID 必须各不相同，重复值：" + pack.uuid());
+        for (PackDefinition pack : loadedPacks) {
+            Path manifest = dataDirectory.resolve("packs").resolve(pack.id()).resolve("pack.yml");
+            YamlConfiguration packYaml = yaml(manifest, relative(manifest));
+            if (!packYaml.getStringList("resource-packs").isEmpty()) {
+                throw error(relative(manifest), "resource-packs",
+                        "此字段已移除；请将客户端资源直接放入本 Pack 的 Assets/ 目录");
             }
         }
     }
@@ -1008,6 +943,4 @@ final class ConfigLoader {
         return new ConfigException(file, path, message);
     }
 
-    private record ResourcePackLoadResult(boolean enabled, List<ResourcePackSpec> packs) {
-    }
 }

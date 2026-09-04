@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "cn.bilicraft"
-version = "0.0.3"
+version = "0.0.4"
 val pluginVersion = version.toString()
 
 repositories {

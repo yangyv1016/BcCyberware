@@ -2,6 +2,15 @@
 
 本项目遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## v0.0.4 - 2026-09-05
+
+- 修正资源包架构：移除 BcCyberware 逐个发送生成包和额外外部包的旧路径；
+- 新增 `RESOURCE_PACK_MANAGER` 推荐部署模式，通过公开 API 注册本地成品，统一管理器负责与其他插件资源合并、托管并只发送最终包；
+- 统一模式下 BcCyberware 不再监听下载端口、不处理进服发送，也不会手动下发第二个包；
+- SELFHOST/EXTERNAL 独立模式改用 Paper/Adventure 的单包替换请求，并明确要求它们独占服务器资源包下发；
+- 旧 `external-packs` 与 Pack 内 `resource-packs` 的非空配置现在会给出明确迁移错误，防止恢复多包下发；
+- 新增 ResourcePackManager 相对路径和统一配置校验测试。
+
 ## v0.0.3 - 2026-09-04
 
 - 固定示例资源包的 ZIP 平台元数据，使 Windows 与 GitHub Actions 生成完全相同的文件和 SHA-1；

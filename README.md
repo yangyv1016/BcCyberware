@@ -14,7 +14,9 @@
 - 可关闭的容量系统，支持固定值、玩家永久值、权限、计分板、mcMMO 与 PlaceholderAPI 数值源；
 - 件数、已用容量、容量百分比三类周期阈值；
 - 通用触发器、条件和动作；
-- 类 MythicCrucible 的 Pack Assets 合并、资源包生成、SELFHOST 与自动下发；
+- 类 MythicCrucible 的 Pack Assets 合并与资源包生成；推荐注册给 ResourcePackManager，
+  由全服统一合并、托管并只下发一个最终资源包；
+- 保留 SELFHOST/EXTERNAL 独立模式，使用 Paper/Adventure 单包替换请求；
 - 原创默认器官材质与示例义体资源包。
 
 ## 构建
@@ -23,7 +25,19 @@
 .\gradlew.bat clean test build
 ```
 
-产物位于 `build/libs/BcCyberware-0.0.3.jar`。首次启动后，默认配置和核心 Pack 的 Assets 会释放到 `plugins/BcCyberware/`；插件不会在读取或重载时回写 YAML，因此服主注释不会被清除。
+产物位于 `build/libs/BcCyberware-0.0.4.jar`。首次启动后，默认配置和核心 Pack 的 Assets 会释放到 `plugins/BcCyberware/`；插件不会在读取或重载时回写 YAML，因此服主注释不会被清除。
+
+## 资源包部署
+
+推荐把 [ResourcePackManager](https://github.com/MagmaGuy/ResourcePackManager) 与本插件 JAR
+一起放入服务端 `plugins/`，再将 `plugins/BcCyberware/resources.yml` 中
+`deployment.enabled` 设为 `true`、保持 `type: RESOURCE_PACK_MANAGER`。义体资源仍放在
+`plugins/BcCyberware/packs/<Pack ID>/Assets/`；生成的
+`plugins/BcCyberware/Generation/resource_pack.zip` 会自动注册给统一管理器，不需要手动搬到
+ResourcePackManager 目录，也不需要给 BcCyberware 填直链或开放 8168 端口。
+
+ResourcePackManager 会把所有插件来源合成一个最终资源包并统一下发。请在它的配置中管理
+公网托管、进服发送、强制加载和提示语，并按需把 `BcCyberware` 加入 `priorityOrder`。
 
 ## 主要命令
 
@@ -34,6 +48,7 @@
 - `/bccyberware inspect`：查看手中义体的内部标识。
 - `/bccyberware pack`：列出已加载的内容 Pack；
 - `/bccyberware resourcepack generate`：合并 Pack Assets 与 `Generation/merge` 并生成资源包；
-- `/bccyberware resourcepack [玩家]`：重新向玩家发送生成后的资源包。
+- `/bccyberware resourcepack [玩家]`：仅在 SELFHOST/EXTERNAL 独立模式下重新发送最终包；
+  统一管理模式请使用 ResourcePackManager 的重发方式。
 
 更多服主说明见 `src/main/resources/README-配置说明.md`。

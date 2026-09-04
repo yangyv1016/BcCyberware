@@ -22,4 +22,3 @@ allow-overrides: false
 
 # 本 Pack 的客户端资源位于同目录的 Assets/。
 # /bccyberware resourcepack generate 会将所有启用 Pack 的 Assets 按优先级合并。
-resource-packs: []

@@ -1,6 +1,5 @@
 package cn.bilicraft.bccyberware.config.model;
 
-import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -19,15 +18,12 @@ public record ConfigSnapshot(
         Map<String, SlotDefinition> slots,
         Map<String, ItemDefinition> items,
         ResourcePackDeploymentSettings resourcePackDeployment,
-        boolean resourcePacksEnabled,
-        List<ResourcePackSpec> resourcePacks,
         Map<String, String> messages
 ) {
     public ConfigSnapshot {
         packs = Map.copyOf(packs);
         slots = Map.copyOf(slots);
         items = Map.copyOf(items);
-        resourcePacks = List.copyOf(resourcePacks);
         messages = Map.copyOf(messages);
     }
 
@@ -49,8 +45,6 @@ public record ConfigSnapshot(
                 slots,
                 items,
                 resourcePackDeployment,
-                resourcePacksEnabled,
-                resourcePacks,
                 merged
         );
     }

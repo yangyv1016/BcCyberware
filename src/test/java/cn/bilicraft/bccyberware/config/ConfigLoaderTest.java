@@ -29,7 +29,7 @@ class ConfigLoaderTest {
         assertEquals("RIGHT_LEG", snapshot.slots().get("core:right-leg").type());
         assertTrue(snapshot.resourcePackDeployment().generationEnabled());
         assertFalse(snapshot.resourcePackDeployment().deploymentEnabled());
-        assertEquals(ResourcePackDeploymentType.SELFHOST, snapshot.resourcePackDeployment().type());
+        assertEquals(ResourcePackDeploymentType.RESOURCE_PACK_MANAGER, snapshot.resourcePackDeployment().type());
         assertEquals(8168, snapshot.resourcePackDeployment().port());
         assertEquals("", snapshot.resourcePackDeployment().publicUrl());
     }
@@ -165,6 +165,62 @@ class ConfigLoaderTest {
 
         ConfigException exception = assertThrows(ConfigException.class, () -> new ConfigLoader(directory).load());
         assertTrue(exception.getMessage().contains("不能包含路径或查询参数"), exception::getMessage);
+    }
+
+    @Test
+    void resourcePackManagerDoesNotRequirePublicUrl() throws Exception {
+        writeBaseFiles();
+        write("packs/core/pack.yml", "id: core\nenabled: true\npriority: 0\n");
+        write("resources.yml", """
+                generation:
+                  enabled: true
+                deployment:
+                  enabled: true
+                  type: RESOURCE_PACK_MANAGER
+                  auto-send:
+                    public-url: ""
+                """);
+
+        ConfigSnapshot snapshot = new ConfigLoader(directory).load();
+        assertTrue(snapshot.resourcePackDeployment().deploymentEnabled());
+        assertEquals(ResourcePackDeploymentType.RESOURCE_PACK_MANAGER,
+                snapshot.resourcePackDeployment().type());
+    }
+
+    @Test
+    void rejectsLegacyExternalPackList() throws Exception {
+        writeBaseFiles();
+        write("packs/core/pack.yml", "id: core\nenabled: true\npriority: 0\n");
+        write("resources.yml", """
+                generation:
+                  enabled: true
+                deployment:
+                  enabled: false
+                external-packs:
+                  enabled: true
+                  packs:
+                    - id: old-pack
+                      uuid: 2dde193f-9e6c-4d02-87f1-21eb126d93f9
+                      url: https://cdn.example.test/old.zip
+                      sha1: 0123456789012345678901234567890123456789
+                """);
+
+        ConfigException exception = assertThrows(ConfigException.class, () -> new ConfigLoader(directory).load());
+        assertTrue(exception.getMessage().contains("不再逐包下发"), exception::getMessage);
+    }
+
+    @Test
+    void rejectsPackResourcePackReferences() throws Exception {
+        writeBaseFiles();
+        write("packs/core/pack.yml", """
+                id: core
+                enabled: true
+                priority: 0
+                resource-packs: [legacy]
+                """);
+
+        ConfigException exception = assertThrows(ConfigException.class, () -> new ConfigLoader(directory).load());
+        assertTrue(exception.getMessage().contains("字段已移除"), exception::getMessage);
     }
 
     private void writeBaseFiles() throws IOException {

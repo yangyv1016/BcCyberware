@@ -1,21 +1,26 @@
-# BcCyberware v0.0.3 交付包
+# BcCyberware v0.0.4 交付包
 
 1. 确认服务端为 Paper 1.21.11，使用 Java 21。
-2. 将 `BcCyberware-0.0.3.jar` 复制到服务端 `plugins/`。
+2. 将 `BcCyberware-0.0.4.jar` 和 ResourcePackManager 放入服务端 `plugins/`。
 3. 首次启动后编辑 `plugins/BcCyberware/` 中的带注释配置。
 4. 默认材质会自动释放到 `packs/core/Assets/`，并生成到
    `Generation/resource_pack.zip`。
-5. 在 `resources.yml` 填写玩家可访问的服务器公网地址和 SELFHOST 端口，把
-   `deployment.enabled` 改成 `true`，并在防火墙/服务器面板放行该 TCP 端口；
-   玩家加入后会自动下载。
+5. 在 `resources.yml` 保持 `type: RESOURCE_PACK_MANAGER`，把
+   `deployment.enabled` 改成 `true`。BcCyberware 会注册本地成品，由
+   ResourcePackManager 与其他插件资源合并后统一托管并下发；不要再在
+   `server.properties` 或其他插件中并行发送另一份资源包。
+6. 义体资源继续放在 `plugins/BcCyberware/packs/<Pack ID>/Assets/`；无需手动移动
+   `Generation/resource_pack.zip`，也无需给 BcCyberware 填写直链或开放 8168。
+   资源冲突优先级在 ResourcePackManager 的 `priorityOrder` 中用 `BcCyberware` 配置。
 
 ## 完整性哈希
 
 - 插件 JAR 与源码 JAR：以 GitHub Release 同批生成的 `SHA256SUMS.txt` 为准。
 - 资源包 SHA-1：以 GitHub Release 同批生成的 `RESOURCE_PACK_SHA1.txt` 为准。
 
-内置 SELFHOST 适合单服正常流量；大型资源包或高并发公网服建议配合反向代理，
-或切换到 EXTERNAL/CDN。
+如不使用统一管理器，可改为 SELFHOST 或 EXTERNAL 独立模式；此时
+BcCyberware 必须成为唯一资源包发送方，所有其他资源都要先合入 Pack `Assets/`
+或 `Generation/merge/`。统一模式切换为独立模式后需要完整重启服务器。
 
 完整配置手册会在首次启动时释放为
 `plugins/BcCyberware/README-配置说明.md`。

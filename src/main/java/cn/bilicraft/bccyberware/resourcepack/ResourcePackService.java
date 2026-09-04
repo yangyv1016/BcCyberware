@@ -4,9 +4,9 @@ import cn.bilicraft.bccyberware.config.ConfigManager;
 import cn.bilicraft.bccyberware.config.model.ConfigSnapshot;
 import cn.bilicraft.bccyberware.config.model.ResourcePackDeploymentSettings;
 import cn.bilicraft.bccyberware.config.model.ResourcePackDeploymentType;
-import cn.bilicraft.bccyberware.config.model.ResourcePackSpec;
 import cn.bilicraft.bccyberware.text.TextService;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import net.kyori.adventure.resource.ResourcePackInfo;
+import net.kyori.adventure.resource.ResourcePackRequest;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -16,6 +16,9 @@ import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -28,6 +31,7 @@ public final class ResourcePackService implements Listener {
     private final TextService text;
     private final ResourcePackGenerator generator;
     private final SelfHostedPackServer selfHost;
+    private final ResourcePackManagerBridge managerBridge;
     private final AtomicBoolean taskRunning = new AtomicBoolean();
     private final AtomicLong operationEpoch = new AtomicLong();
     private volatile DeploymentState state = new DeploymentState(null, null, false);
@@ -38,6 +42,7 @@ public final class ResourcePackService implements Listener {
         this.configs = configs;
         this.text = text;
         this.generator = new ResourcePackGenerator(plugin.getDataFolder().toPath());
+        this.managerBridge = new ResourcePackManagerBridge(plugin);
         this.selfHost = new SelfHostedPackServer(
                 plugin.getLogger(),
                 plugin.getDataFolder().toPath().resolve(".runtime/resourcepack-cache")
@@ -45,6 +50,20 @@ public final class ResourcePackService implements Listener {
     }
 
     public boolean start() {
+        ResourcePackDeploymentSettings settings = configs.current().resourcePackDeployment();
+        if (settings.deploymentEnabled()
+                && settings.type() == ResourcePackDeploymentType.RESOURCE_PACK_MANAGER) {
+            Path existing = plugin.getDataFolder().toPath().resolve(settings.outputFile()).normalize();
+            if (Files.isRegularFile(existing)) {
+                try {
+                    managerBridge.register(existing);
+                    plugin.getLogger().info("启动阶段已向 ResourcePackManager 注册现有 BcCyberware 资源包。");
+                } catch (IOException exception) {
+                    plugin.getLogger().warning("启动阶段无法注册现有资源包，将在生成完成后重试："
+                            + exception.getMessage());
+                }
+            }
+        }
         return scheduleDeployment(true, null);
     }
 
@@ -88,7 +107,7 @@ public final class ResourcePackService implements Listener {
         ResourcePackGenerator.GeneratedResourcePack candidate = null;
         if (settings.generationEnabled() && settings.generateOnStartup()) {
             candidate = generator.generate(snapshot);
-        } else if (settings.deploymentEnabled() && settings.type() == ResourcePackDeploymentType.SELFHOST) {
+        } else if (settings.deploymentEnabled() && settings.type() != ResourcePackDeploymentType.EXTERNAL) {
             candidate = generator.inspectExisting(snapshot);
         }
 
@@ -145,11 +164,27 @@ public final class ResourcePackService implements Listener {
         boolean wasReady = previousState.ready();
 
         try {
+            if (wasReady && previous != null
+                    && previous.type() == ResourcePackDeploymentType.RESOURCE_PACK_MANAGER
+                    && (!settings.deploymentEnabled()
+                    || settings.type() != ResourcePackDeploymentType.RESOURCE_PACK_MANAGER)) {
+                throw new IOException("ResourcePackManager 的公开 API 没有取消注册方法；"
+                        + "从统一管理模式切换到其他模式或关闭部署后必须重启服务器，避免同时下发两份资源包");
+            }
             if (settings.deploymentEnabled() && settings.type() == ResourcePackDeploymentType.SELFHOST) {
                 selfHost.startPrepared(settings.bindAddress(), settings.port(), prepared.selfHosted());
                 plugin.getLogger().info("资源包 SELFHOST 已监听 " + settings.bindAddress() + ":" + settings.port()
                         + "，文件 " + prepared.candidate().file().getFileName()
                         + "，SHA-1 " + prepared.candidate().sha1Hex());
+            } else if (settings.deploymentEnabled()
+                    && settings.type() == ResourcePackDeploymentType.RESOURCE_PACK_MANAGER) {
+                if (prepared.candidate() == null) {
+                    throw new IOException("RESOURCE_PACK_MANAGER 没有可注册的本地资源包");
+                }
+                managerBridge.registerAndReload(prepared.candidate().file());
+                selfHost.close();
+                plugin.getLogger().info("已将 " + prepared.candidate().file().getFileName()
+                        + " 注册给 ResourcePackManager；最终资源包由统一管理器合并、托管并下发。");
             } else {
                 selfHost.close();
             }
@@ -160,7 +195,7 @@ public final class ResourcePackService implements Listener {
         }
 
         if (prepared.candidate() != null
-                && (!settings.deploymentEnabled() || settings.type() != ResourcePackDeploymentType.SELFHOST)) {
+                && (!settings.deploymentEnabled() || settings.type() == ResourcePackDeploymentType.EXTERNAL)) {
             plugin.getLogger().info("资源包已生成：" + prepared.candidate().file()
                     + "，SHA-1 " + prepared.candidate().sha1Hex());
         }
@@ -179,8 +214,8 @@ public final class ResourcePackService implements Listener {
         );
         state = currentState;
         if (notifyOnlinePlayers) {
-            if (wasReady && previous != null
-                    && (!currentState.ready() || !previous.uuid().equals(settings.uuid()))) {
+            if (wasReady && isDirect(previous)
+                    && (!currentState.ready() || !isDirect(settings) || !previous.uuid().equals(settings.uuid()))) {
                 Bukkit.getOnlinePlayers().forEach(player -> player.removeResourcePack(previous.uuid()));
             }
             boolean changed = !wasReady
@@ -195,7 +230,7 @@ public final class ResourcePackService implements Listener {
                     || (settings.type() == ResourcePackDeploymentType.EXTERNAL
                     && !Arrays.equals(previous.externalSha1(), settings.externalSha1()));
             boolean firstAvailableDeployment = !wasReady;
-            if (currentState.ready() && settings.autoSendEnabled()
+            if (currentState.ready() && isDirect(settings) && settings.autoSendEnabled()
                     && (firstAvailableDeployment || (settings.sendOnUpdate() && changed))) {
                 Bukkit.getOnlinePlayers().forEach(this::sendGenerated);
             }
@@ -274,6 +309,11 @@ public final class ResourcePackService implements Listener {
                                     throw new IllegalStateException("SELFHOST 准备结果与当前部署状态不一致");
                                 }
                                 selfHost.publishPrepared(prepared.selfHosted());
+                            }
+                            if (currentState.ready() && active != null
+                                    && active.type() == ResourcePackDeploymentType.RESOURCE_PACK_MANAGER) {
+                                managerBridge.registerAndReload(prepared.candidate().file());
+                                plugin.getLogger().info("ResourcePackManager 已重新合并 BcCyberware 的最新资源。");
                             }
                             state = new DeploymentState(active, prepared.candidate(), currentState.ready());
                             plugin.getLogger().info("资源包已生成：" + prepared.candidate().file()
@@ -357,9 +397,9 @@ public final class ResourcePackService implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         DeploymentState currentState = state;
         ResourcePackDeploymentSettings settings = currentState.settings();
-        boolean generatedAutoSend = settings != null && currentState.ready() && settings.autoSendEnabled();
-        boolean externalAutoSend = configs.current().resourcePacksEnabled();
-        if (!generatedAutoSend && !externalAutoSend) {
+        boolean generatedAutoSend = settings != null && currentState.ready()
+                && isDirect(settings) && settings.autoSendEnabled();
+        if (!generatedAutoSend) {
             return;
         }
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -369,39 +409,42 @@ public final class ResourcePackService implements Listener {
                 if (current != null && delayedState.ready() && current.autoSendEnabled()) {
                     sendGenerated(event.getPlayer());
                 }
-                if (configs.current().resourcePacksEnabled()) {
-                    sendExternal(event.getPlayer());
-                }
             }
         }, configs.current().resourcePackDelayTicks());
     }
 
     public void send(Player player) {
+        DeploymentState currentState = state;
+        ResourcePackDeploymentSettings settings = currentState.settings();
+        if (settings == null || !currentState.ready()) {
+            text.send(player, "resource-pack-unavailable");
+            return;
+        }
+        if (settings.type() == ResourcePackDeploymentType.RESOURCE_PACK_MANAGER) {
+            text.send(player, "resource-pack-managed-externally");
+            return;
+        }
         sendGenerated(player);
-        sendExternal(player);
     }
 
     private void sendGenerated(Player player) {
         DeploymentState currentState = state;
         ResourcePackDeploymentSettings settings = currentState.settings();
         ResourcePackGenerator.GeneratedResourcePack current = currentState.pack();
-        if (currentState.ready() && settings != null
+        if (currentState.ready() && settings != null && isDirect(settings)
                 && (settings.type() == ResourcePackDeploymentType.EXTERNAL || current != null)) {
             String url = generatedUrl(settings, current == null ? "" : current.sha1Hex());
-            String prompt = PlainTextComponentSerializer.plainText().serialize(text.render(settings.prompt()));
-            byte[] sha1 = settings.type() == ResourcePackDeploymentType.EXTERNAL
-                    ? settings.externalSha1()
-                    : current.sha1();
-            player.addResourcePack(settings.uuid(), url, sha1, prompt, settings.required());
-        }
-    }
-
-    private void sendExternal(Player player) {
-        if (configs.current().resourcePacksEnabled()) {
-            for (ResourcePackSpec pack : configs.current().resourcePacks()) {
-                String prompt = PlainTextComponentSerializer.plainText().serialize(text.render(pack.prompt()));
-                player.addResourcePack(pack.uuid(), pack.url(), pack.sha1(), prompt, pack.required());
-            }
+            String sha1 = settings.type() == ResourcePackDeploymentType.EXTERNAL
+                    ? toHex(settings.externalSha1())
+                    : current.sha1Hex();
+            ResourcePackInfo info = ResourcePackInfo.resourcePackInfo(settings.uuid(), URI.create(url), sha1);
+            ResourcePackRequest request = ResourcePackRequest.resourcePackRequest()
+                    .packs(info)
+                    .replace(true)
+                    .required(settings.required())
+                    .prompt(text.render(settings.prompt()))
+                    .build();
+            player.sendResourcePacks(request);
         }
     }
 
@@ -413,13 +456,25 @@ public final class ResourcePackService implements Listener {
         return configured;
     }
 
+    private boolean isDirect(ResourcePackDeploymentSettings settings) {
+        return settings != null && (settings.type() == ResourcePackDeploymentType.SELFHOST
+                || settings.type() == ResourcePackDeploymentType.EXTERNAL);
+    }
+
+    private String toHex(byte[] bytes) {
+        StringBuilder result = new StringBuilder(bytes.length * 2);
+        for (byte value : bytes) {
+            result.append(String.format("%02x", value & 0xff));
+        }
+        return result.toString();
+    }
+
     @EventHandler
     public void onStatus(PlayerResourcePackStatusEvent event) {
         ResourcePackDeploymentSettings settings = state.settings();
-        boolean generatedPackEvent = settings != null && event.getID().equals(settings.uuid());
-        boolean externalPackEvent = configs.current().resourcePacks().stream()
-                .anyMatch(pack -> event.getID().equals(pack.uuid()));
-        if (!generatedPackEvent && !externalPackEvent) {
+        boolean generatedPackEvent = settings != null && isDirect(settings)
+                && event.getID().equals(settings.uuid());
+        if (!generatedPackEvent) {
             return;
         }
         String status = event.getStatus().name();

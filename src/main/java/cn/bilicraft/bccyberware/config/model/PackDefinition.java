@@ -11,13 +11,10 @@ public record PackDefinition(
         int priority,
         List<String> depends,
         List<String> softDepends,
-        boolean allowOverrides,
-        List<String> resourcePacks
+        boolean allowOverrides
 ) {
     public PackDefinition {
         depends = List.copyOf(depends);
         softDepends = List.copyOf(softDepends);
-        resourcePacks = List.copyOf(resourcePacks);
     }
 }
-

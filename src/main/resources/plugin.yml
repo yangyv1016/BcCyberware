@@ -4,7 +4,7 @@ main: cn.bilicraft.bccyberware.BcCyberwarePlugin
 description: 可配置的 Paper 义体、原生器官、容量与身体状态系统
 api-version: '1.21.11'
 authors: [BiliCraft]
-softdepend: [PlaceholderAPI, mcMMO, Citizens]
+softdepend: [PlaceholderAPI, mcMMO, Citizens, ResourcePackManager]
 
 commands:
   bccyberware:

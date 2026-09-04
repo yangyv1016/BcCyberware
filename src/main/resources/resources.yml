@@ -19,28 +19,35 @@ generation:
   merge-directory: "Generation/merge"
 
 deployment:
-  # 首次安装默认关闭，避免示例地址导致远程玩家下载失败。
-  # 填好 public-url、放行端口后改为 true，玩家即可自动下载。
+  # 首次安装默认关闭。安装并配置 ResourcePackManager 后改为 true。
   enabled: false
 
-  # SELFHOST：插件自己托管 Generation/resource_pack.zip。
-  # EXTERNAL：插件只生成 ZIP，由 public-url 指向你自行上传后的完整下载地址。
-  type: SELFHOST
+  # RESOURCE_PACK_MANAGER（推荐）：把本地成品注册给 ResourcePackManager。
+  #   由它与其他插件资源合并成一个最终服务器包，再统一托管和发送。
+  #   此模式下 BcCyberware 不开下载端口，也不会向玩家单独发送第二个包。
+  # SELFHOST：独立模式。BcCyberware 托管并独占下发一个最终 ZIP。
+  # EXTERNAL：独立模式。BcCyberware 下发你自行托管的一个最终 ZIP。
+  # SELFHOST/EXTERNAL 都要求你先把其他插件资源合入 Pack Assets 或 Generation/merge；
+  # 不要再让 server.properties 或其他插件同时下发另一份资源包。
+  type: RESOURCE_PACK_MANAGER
 
   self-hosting:
-    # 监听所有网卡。一般无需修改。
+    # 以下两项仅 SELFHOST 使用。监听所有网卡，一般无需修改。
     bind-address: "0.0.0.0"
 
-    # 必须在服务器面板/防火墙中放行 TCP；不能与 Minecraft 端口重复。
+    # SELFHOST 必须在服务器面板/防火墙中放行 TCP；不能与 Minecraft 端口重复。
     port: 8168
 
   auto-send:
-    # true：玩家加入后自动弹出并下载服务器资源包。
+    # 以下字段只用于 SELFHOST/EXTERNAL。RESOURCE_PACK_MANAGER 模式完全忽略它们，
+    # 是否进服发送、是否强制、提示文本和公网地址只由 ResourcePackManager 配置决定。
+    # true：独立模式下，玩家加入后自动弹出并下载最终资源包。
     enabled: true
 
     # true：管理员重新生成资源包后，立即推送给所有在线玩家。
     send-on-update: true
 
+    # RESOURCE_PACK_MANAGER 时保持留空。
     # SELFHOST 时填写玩家能访问的协议、服务器公网 IP/域名和上面的端口。
     # 示例：http://你的服务器公网域名:8168
     # EXTERNAL 时填写最终 ZIP 的完整直链。
@@ -58,8 +65,3 @@ deployment:
     # true：玩家拒绝资源包时由客户端断开连接。
     force: true
     prompt: "<aqua>BcCyberware 需要加载义体外观资源包。"
-
-# 兼容旧版的额外外部资源包列表。一般保持关闭；这些包会在生成包之后依次发送。
-external-packs:
-  enabled: false
-  packs: []

@@ -166,8 +166,6 @@ class ResourcePackGeneratorTest {
                 Map.of(),
                 Map.of(),
                 deployment,
-                false,
-                List.of(),
                 Map.of()
         );
     }
@@ -186,8 +184,7 @@ class ResourcePackGeneratorTest {
                 priority,
                 depends,
                 List.of(),
-                false,
-                List.of()
+                false
         );
     }
 
